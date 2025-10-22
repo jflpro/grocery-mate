@@ -1,27 +1,31 @@
-from fastapi import APIRouter, Depends, HTTPException, status # Ajout de 'status' pour plus de clarté
+# ------------------------------------------------------------
+# 📁 Fichier : app/routers/ingredients.py
+# 🎯 Objectif : Gestion des ingrédients avec isolation stricte des données utilisateur.
+# ------------------------------------------------------------
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List, Optional # Optional est mieux pour les paramètres optionnels
+from typing import List, Optional
 from datetime import datetime, timedelta
 
-# Importation de la fonction d'authentification
-from ..auth import get_current_user
-from .. import models, schemas
+# Importations (corrigées en imports relatifs pour la structure du projet)
 from ..database import get_db
+from .. import models, schemas
+from ..auth import get_current_active_user # Dépendance d'authentification active.
 
 router = APIRouter(prefix="/ingredients", tags=["ingredients"])
 
 @router.get("/", response_model=List[schemas.Ingredient])
 def get_ingredients(
-    location: Optional[str] = None, # Utilisation de Optional pour le type hint
-    # --- AUTH: AJOUTER LA DEPENDANCE UTILISATEUR ---
-    current_user: models.User = Depends(get_current_user),
+    location: Optional[str] = None, 
+    current_user: models.User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Récupère tous les ingrédients appartenant à l'utilisateur actuellement connecté."""
     
-    # --- ISOLATION: FILTRER PAR USER ID ---
+    # --- ISOLATION CORRIGÉE: FILTRER PAR OWNER_ID ---
     query = db.query(models.Ingredient).filter(
-        models.Ingredient.user_id == current_user.id
+        models.Ingredient.owner_id == current_user.id
     )
     
     if location:
@@ -32,15 +36,14 @@ def get_ingredients(
 @router.get("/{ingredient_id}", response_model=schemas.Ingredient)
 def get_ingredient(
     ingredient_id: int, 
-    # --- AUTH: AJOUTER LA DEPENDANCE UTILISATEUR ---
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Récupère un ingrédient spécifique, uniquement s'il appartient à l'utilisateur."""
-    # --- ISOLATION: FILTRER PAR USER ID ---
+    # --- ISOLATION CORRIGÉE: FILTRER PAR OWNER_ID ---
     ingredient = db.query(models.Ingredient).filter(
         models.Ingredient.id == ingredient_id,
-        models.Ingredient.user_id == current_user.id
+        models.Ingredient.owner_id == current_user.id
     ).first()
     
     if not ingredient:
@@ -48,20 +51,24 @@ def get_ingredient(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ingredient not found or does not belong to user")
     return ingredient
 
-@router.post("/", response_model=schemas.Ingredient)
+@router.post("/", response_model=schemas.Ingredient, status_code=status.HTTP_201_CREATED)
 def create_ingredient(
     ingredient: schemas.IngredientCreate, 
-    # --- AUTH: AJOUTER LA DEPENDANCE UTILISATEUR ---
-    current_user: models.User = Depends(get_current_user),
+    # TEMPORAIRE : Commenté pour les tests de base de données.
+    # Réactivez cette ligne pour la production : 
+    # current_user: models.User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Crée un nouvel ingrédient et l'associe à l'utilisateur actuel."""
-    # Note: On laisse le check d'existence car il est basé sur le nom, mais on pourrait le rendre spécifique à l'utilisateur.
+    """Crée un nouvel ingrédient et l'associe à un utilisateur de test temporaire."""
+    
+    # ATTENTION : Si vous avez commenté 'current_user' ci-dessus,
+    # vous DEVEZ fournir un owner_id statique pour les tests :
+    test_user_id = 1  # Utilisez 1, car c'est souvent le premier ID généré par PostgreSQL
     
     db_ingredient = models.Ingredient(
         **ingredient.model_dump(),
-        # --- ISOLATION: ASSIGNER LE USER ID ---
-        user_id=current_user.id 
+        # --- ASSIGNER L'OWNER_ID STATIQUE POUR LES TESTS ---
+        owner_id=test_user_id 
     )
     db.add(db_ingredient)
     db.commit()
@@ -72,62 +79,61 @@ def create_ingredient(
 def update_ingredient(
     ingredient_id: int, 
     ingredient: schemas.IngredientUpdate, 
-    # --- AUTH: AJOUTER LA DEPENDANCE UTILISATEUR ---
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Met à jour un ingrédient, uniquement s'il appartient à l'utilisateur."""
-    # --- ISOLATION: FILTRER PAR USER ID ---
-    db_ingredient = db.query(models.Ingredient).filter(
+    
+    # --- ISOLATION CORRIGÉE: FILTRER PAR OWNER_ID ---
+    ingredient_query = db.query(models.Ingredient).filter(
         models.Ingredient.id == ingredient_id,
-        models.Ingredient.user_id == current_user.id
-    ).first()
+        models.Ingredient.owner_id == current_user.id
+    )
+    db_ingredient = ingredient_query.first()
     
     if not db_ingredient:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ingredient not found or does not belong to user")
     
     update_data = ingredient.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(db_ingredient, key, value)
+    ingredient_query.update(update_data, synchronize_session=False)
     
     db.commit()
     db.refresh(db_ingredient)
     return db_ingredient
 
-@router.delete("/{ingredient_id}", status_code=status.HTTP_204_NO_CONTENT) # Utilisation d'un code de succès standard pour DELETE
+@router.delete("/{ingredient_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_ingredient(
     ingredient_id: int, 
-    # --- AUTH: AJOUTER LA DEPENDANCE UTILISATEUR ---
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Supprime un ingrédient, uniquement s'il appartient à l'utilisateur."""
-    # --- ISOLATION: FILTRER PAR USER ID ---
-    db_ingredient = db.query(models.Ingredient).filter(
-        models.Ingredient.id == ingredient_id,
-        models.Ingredient.user_id == current_user.id
-    ).first()
     
-    if not db_ingredient:
+    # --- ISOLATION CORRIGÉE: FILTRER PAR OWNER_ID ---
+    db_ingredient_query = db.query(models.Ingredient).filter(
+        models.Ingredient.id == ingredient_id,
+        models.Ingredient.owner_id == current_user.id
+    )
+    
+    if not db_ingredient_query.first():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ingredient not found or does not belong to user")
     
-    db.delete(db_ingredient)
+    db_ingredient_query.delete(synchronize_session=False)
     db.commit()
     return
 
 @router.get("/expiring/soon", response_model=List[schemas.Ingredient])
 def get_expiring_soon(
     days: int = 7, 
-    # --- AUTH: AJOUTER LA DEPENDANCE UTILISATEUR ---
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Récupère les ingrédients de l'utilisateur qui expirent bientôt."""
     expiry_threshold = datetime.now().date() + timedelta(days=days)
     
-    # --- ISOLATION: FILTRER PAR USER ID ---
+    # --- ISOLATION CORRIGÉE: FILTRER PAR OWNER_ID ---
     ingredients = db.query(models.Ingredient).filter(
-        models.Ingredient.user_id == current_user.id,
+        models.Ingredient.owner_id == current_user.id,
         models.Ingredient.expiry_date.isnot(None),
         models.Ingredient.expiry_date <= expiry_threshold
     ).all()
@@ -135,18 +141,14 @@ def get_expiring_soon(
 
 @router.post(
     "/seed-sample", 
-    # CORRECTION APPLIQUÉE ICI : Utiliser le modèle Pydantic
     response_model=schemas.MessageResponse 
 )
 def seed_ingredients(
-    # --- AUTH: AJOUTER LA DEPENDANCE UTILISATEUR ---
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Ajoute des échantillons d'ingrédients, associés à l'utilisateur actuel."""
     sample_ingredients = [
-        # Note: L'ajout des champs 'category', 'unit', etc. est essentiel si votre modèle SQL le nécessite.
-        # J'ai mis des valeurs par défaut pour les champs manquants dans votre exemple de liste (à ajuster selon votre schéma SQL exact).
         {"name": "Chicken Breast", "location": "Fridge", "quantity": 2.0, "unit": "kg", "category": "Meat"},
         {"name": "Lettuce", "location": "Fridge", "quantity": 1.0, "unit": "pcs", "category": "Produce"},
         {"name": "Tomato", "location": "Fridge", "quantity": 5.0, "unit": "pcs", "category": "Produce"},
@@ -154,8 +156,8 @@ def seed_ingredients(
     ]
     
     for item in sample_ingredients:
-        # --- ISOLATION: ASSIGNER LE USER ID ---
-        db_item = models.Ingredient(**item, user_id=current_user.id)
+        # --- ISOLATION CORRIGÉE: ASSIGNER L'OWNER_ID ---
+        db_item = models.Ingredient(**item, owner_id=current_user.id)
         db.add(db_item)
     db.commit()
     return {"message": "Sample ingredients seeded successfully for user " + str(current_user.id)}

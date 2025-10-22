@@ -18,7 +18,7 @@ app = FastAPI(
 # Permet au frontend (http://localhost:5173 ou 3000) de communiquer avec l'API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

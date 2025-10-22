@@ -6,29 +6,29 @@ const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000/api"
 
 // 1. Création de l'instance Axios configurée
 const api = axios.create({
-  // Utilise l'URL récupérée depuis les variables d'environnement
-  baseURL: API_BASE,
-  headers: {
-    "Content-Type": "application/json",
-  },
+  // Utilise l'URL récupérée depuis les variables d'environnement
+  baseURL: API_BASE,
+  headers: {
+    "Content-Type": "application/json",
+  },
 });
 
 // 2. Intercepteur pour l'injection du jeton
 // Cet intercepteur s'exécute avant chaque requête.
 api.interceptors.request.use(
-  (config) => {
-    // Récupérer le token du localStorage
-    const token = localStorage.getItem("access_token");
+  (config) => {
+    // Récupérer le token du localStorage
+    const token = localStorage.getItem("access_token");
 
-    // Si un token existe, on l'ajoute à l'en-tête Authorization.
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
+    // Si un token existe, on l'ajoute à l'en-tête Authorization.
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
 );
 
 // 3. Exportation de l'instance par défaut
@@ -39,66 +39,68 @@ export default api;
 
 // 🛒 --- Shopping Lists API ---
 export const shoppingListsAPI = {
-  // Lire toutes les listes
-  getAll: () => api.get(`/shopping-lists/`),
+  // Lire toutes les listes
+  getAll: () => api.get(`/shopping-lists/`),
 
-  // Créer une nouvelle liste
-  add: (data) => api.post(`/shopping-lists/`, data),
+  // Créer une nouvelle liste
+  add: (data) => api.post(`/shopping-lists/`, data),
 
-  // Mettre à jour une liste (nom, etc.)
-  update: (id, data) => api.put(`/shopping-lists/${id}`, data),
+  // Mettre à jour une liste (nom, etc.)
+  update: (id, data) => api.put(`/shopping-lists/${id}`, data),
 
-  // Supprimer une liste
-  delete: (id) => api.delete(`/shopping-lists/${id}`),
+  // Supprimer une liste
+  delete: (id) => api.delete(`/shopping-lists/${id}`),
 
-  // Ajouter un item à une liste donnée
-  addItem: (listId, item) => api.post(`/shopping-lists/${listId}/items`, item),
+  // Ajouter un item à une liste donnée
+  addItem: (listId, item) => api.post(`/shopping-lists/${listId}/items`, item),
 
-  // Mettre à jour un item existant
-  updateItem: (itemId, data) => api.put(`/shopping-lists/items/${itemId}`, data),
+  // Mettre à jour un item existant
+  updateItem: (itemId, data) => api.put(`/shopping-lists/items/${itemId}`, data),
 
-  // Supprimer un item
-  deleteItem: (itemId) => api.delete(`/shopping-lists/items/${itemId}`),
+  // Supprimer un item
+  deleteItem: (itemId) => api.delete(`/shopping-lists/items/${itemId}`),
 };
 
 // 🍄 --- Ingredients API ---
 export const ingredientsAPI = {
-  getAll: () => api.get(`/ingredients/`),
-  add: (data) => api.post(`/ingredients/`, data),
-  update: (id, data) => api.put(`/ingredients/${id}`, data),
-  delete: (id) => api.delete(`/ingredients/${id}`),
+  getAll: () => api.get(`/ingredients/`),
+  add: (data) => api.post(`/ingredients/`, data),
+  update: (id, data) => api.put(`/ingredients/${id}`, data),
+  delete: (id) => api.delete(`/ingredients/${id}`),
 
-  // Ingrédients qui expirent bientôt
-  getExpiringSoon: () => api.get(`/ingredients/expiring/soon`),
+  // Ingrédients qui expirent bientôt
+  getExpiringSoon: () => api.get(`/ingredients/expiring/soon`),
 
-  // Remplir la base avec des données d’exemple
-  seedSample: () => api.post(`/ingredients/seed-sample`),
+  // Remplir la base avec des données d’exemple
+  seedSample: () => api.post(`/ingredients/seed-sample`),
 };
 
 // 🍽️ --- Recipes API ---
 export const recipesAPI = {
-  getAll: () => api.get(`/recipes/`),
-  add: (data) => api.post(`/recipes/`, data),
-  update: (id, data) => api.put(`/recipes/${id}`, data),
-  delete: (id) => api.delete(`/recipes/${id}`),
+  getAll: () => api.get(`/recipes/`),
+  add: (data) => api.post(`/recipes/`, data),
+  update: (id, data) => api.put(`/recipes/${id}`, data),
+  delete: (id) => api.delete(`/recipes/${id}`),
 
-  // Trouver les recettes réalisables avec les ingrédients disponibles
-  findMatching: () => api.get(`/recipes/match/ingredients`),
+  // Trouver les recettes réalisables avec les ingrédients disponibles
+  findMatching: () => api.get(`/recipes/match/ingredients`),
 
-  // Charger des recettes d’exemple
-  seedSample: () => api.post(`/recipes/seed-sample`),
+  // Charger des recettes d’exemple
+  seedSample: () => api.post(`/recipes/seed-sample`),
 };
 
 // 🔑 --- Auth API ---
 // NOTE IMPORTANTE: Nous utilisons 'api' pour ces routes.
 // L'intercepteur n'ajoute pas le token si la requête n'en a pas encore, ce qui est correct pour login/register.
 export const authAPI = {
-  register: (data) => api.post(`/auth/register`, data),
-  // La route /auth/token (login) utilise un format form-data, nous l'appellerons directement depuis Login.vue
-  me: () => api.get(`/auth/me`),
+  register: (data) => api.post(`/auth/register`, data),
+  // La route /auth/token (login) utilise un format form-data, nous l'appellerons directement depuis Login.vue
+  me: () => api.get(`/auth/me`),
+  // NOUVEAU: Ajout de l'appel POST pour la déconnexion
+  logout: () => api.post(`/auth/logout`),
 };
 
 // 🧪 --- Seed global (toutes les données de test) ---
 export const seedAPI = {
-  seedAll: () => api.post(`/seed/`),
+  seedAll: () => api.post(`/seed/`),
 };

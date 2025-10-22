@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict, Any 
-import json # Nécessaire si vous stockez des instructions JSON ou pour le débogage
-import copy # Utile si vous manipulez des objets complexes
+import json 
+import copy 
 
 from fastapi import Depends, APIRouter, status, HTTPException
 from sqlalchemy.orm import Session
@@ -9,7 +9,7 @@ from sqlalchemy import or_
 
 from .. import models, schemas, auth 
 from ..database import get_db
-# CORRECTION: Importation directe de la fonction depuis le sous-module
+# Importation directe de la fonction depuis le sous-module
 from ..crud.recipe_generator import generate_recipe_from_ingredients 
 
 # Initialisation du routeur
@@ -45,11 +45,13 @@ def get_all_recipes(
     
     # --- LOGIQUE DE SÉCURITÉ/VISIBILITÉ ---
     if current_user:
+        # Afficher les recettes de l'utilisateur ET les recettes publiques
         query = query.filter(or_(
             models.Recipe.owner_id == current_user.id,
             models.Recipe.is_public == True
         ))
     else:
+        # Seulement les recettes publiques pour les utilisateurs non authentifiés
         query = query.filter(models.Recipe.is_public == True)
         
     # Filtrage par recherche
@@ -64,14 +66,14 @@ def get_all_recipes(
 def create_recipe(
     recipe: schemas.RecipeCreate, 
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user) 
+    current_user: models.User = Depends(auth.get_current_active_user) 
 ):
     """Crée une nouvelle recette. Doit gérer l'insertion des ingrédients requis."""
     
     # 1. Préparer les données de la recette principale (exclure la liste d'ingrédients)
     recipe_data = recipe.model_dump(exclude={"required_ingredients"}, exclude_none=True)
     new_recipe = models.Recipe(
-        owner_id=current_user.id,
+        owner_id=current_user.id, # Clé étrangère correcte
         **recipe_data
     )
     
@@ -109,6 +111,7 @@ def get_recipe(
     recipe = get_recipe_or_404(db, recipe_id)
     
     # --- LOGIQUE DE SÉCURITÉ/VISIBILITÉ ---
+    # Si la recette n'est pas publique ET que l'utilisateur n'est pas l'owner
     if not recipe.is_public and (not current_user or recipe.owner_id != current_user.id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, 
@@ -120,16 +123,15 @@ def get_recipe(
 @router.put("/{recipe_id}", response_model=schemas.RecipeOut)
 def update_recipe(
     recipe_id: int, 
-    # Correction: Utilisation de RecipeUpdate pour les mises à jour partielles des champs principaux
     updated_recipe: schemas.RecipeUpdate, 
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(auth.get_current_active_user)
 ):
     """Met à jour une recette existante. Seul le propriétaire peut modifier."""
     
     recipe_query = db.query(models.Recipe).filter(
         models.Recipe.id == recipe_id,
-        models.Recipe.owner_id == current_user.id
+        models.Recipe.owner_id == current_user.id # Vérification d'autorisation
     )
     recipe = recipe_query.first()
     
@@ -150,13 +152,13 @@ def update_recipe(
 def delete_recipe(
     recipe_id: int, 
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(auth.get_current_active_user)
 ):
     """Supprime une recette. Seul le propriétaire peut supprimer."""
     
     recipe_query = db.query(models.Recipe).filter(
         models.Recipe.id == recipe_id,
-        models.Recipe.owner_id == current_user.id
+        models.Recipe.owner_id == current_user.id # Vérification d'autorisation
     )
     
     if not recipe_query.first():
@@ -177,7 +179,7 @@ def delete_recipe(
 @router.post("/generate", status_code=status.HTTP_200_OK)
 async def generate_recipe(
     db: Session = Depends(get_db), 
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(auth.get_current_active_user)
 ) -> Dict[str, Any]:
     """
     Génère une recette structurée à partir de l'inventaire de l'utilisateur via l'API Gemini.
@@ -185,11 +187,11 @@ async def generate_recipe(
     user_id = current_user.id
     
     # 1. Récupérer tous les ingrédients de l'utilisateur (l'inventaire)
+    # CORRECTION D'INTÉGRITÉ: Utilisation de 'owner_id' au lieu de 'user_id'
     user_ingredients = db.query(models.Ingredient).filter(models.Ingredient.owner_id == user_id).all()
     
     # 2. Appeler la fonction de génération de recette asynchrone
     try:
-        # Utilisation de la fonction directement importée
         recipe_data = await generate_recipe_from_ingredients(user_ingredients)
         
         return {
@@ -211,19 +213,19 @@ async def generate_recipe(
 
 @router.get(
     "/check-inventory", 
-    # CORRECTION: Utilisation du bon schéma de réponse pour la vérification
     response_model=List[schemas.InventoryCheckResponse], 
     summary="Identifier les recettes faisables avec l'inventaire actuel"
 )
 def check_recipes_feasibility(
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user) 
+    current_user: models.User = Depends(auth.get_current_active_user) 
 ):
     """
     Vérifie les recettes accessibles à l'utilisateur contre son inventaire.
     """
     
     # 1. Récupère l'inventaire de l'utilisateur
+    # CORRECTION D'INTÉGRITÉ: Utilisation de 'owner_id' au lieu de 'user_id'
     inventory = db.query(models.Ingredient).filter(
         models.Ingredient.owner_id == current_user.id
     ).all()
@@ -288,7 +290,7 @@ def check_recipes_feasibility(
                 })
 
         # 5. Ajoute le résultat
-        results.append(schemas.InventoryCheckResponse( # CORRECTION: Utilisation du bon schéma
+        results.append(schemas.InventoryCheckResponse(
             recipe_id=recipe.id, 
             can_make=can_make,
             missing_items=missing_items,

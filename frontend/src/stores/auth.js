@@ -1,7 +1,5 @@
 import { defineStore } from 'pinia';
-// Correction du chemin: l'alias '@/services/api' pointe vers 'frontend/src/services/api.js'
 import api, { authAPI } from '@/services/api';
-// L'alias '@/router' pointe vers 'frontend/src/router/index.js'
 import router from '@/router';
 
 // Définition du Pinia Store pour l'authentification
@@ -30,8 +28,7 @@ export const useAuthStore = defineStore('auth', {
      */
     async login(credentials) {
       try {
-        // La route login (/auth/token) est gérée ici car elle requiert un format form-data
-        // qui n'est pas le format par défaut de l'instance 'api' (JSON).
+        // 1. Obtenir le token (avec form-data)
         const tokenResponse = await api.post('/auth/token', new URLSearchParams(credentials), {
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -41,14 +38,16 @@ export const useAuthStore = defineStore('auth', {
         const token = tokenResponse.data.access_token;
         localStorage.setItem('access_token', token);
 
-        // Après avoir reçu le jeton, on récupère les infos utilisateur
+        // 2. Récupère les infos utilisateur (utilise l'intercepteur configuré dans api.js)
         await this.fetchUser();
 
+        // 3. COMMANDE CRITIQUE DE REDIRECTION (vers la route nommée 'home')
         router.push({ name: 'home' });
 
         return true;
       } catch (error) {
-        this.logout(false);
+        // Si la connexion ou le fetchUser échoue, forcer la déconnexion
+        this.forceLogout(false);
         throw error;
       }
     },
@@ -60,6 +59,7 @@ export const useAuthStore = defineStore('auth', {
     async register(data) {
         try {
             await authAPI.register(data);
+            // Redirection vers la page de connexion après inscription réussie
             router.push({ name: 'login' });
             return true;
         } catch (error) {
@@ -81,17 +81,35 @@ export const useAuthStore = defineStore('auth', {
         const response = await authAPI.me();
         this.user = response.data;
       } catch (error) {
-        console.error("Échec de la récupération des informations utilisateur. Déconnexion.", error);
-        this.logout(false);
+        console.error("Échec de la récupération des informations utilisateur. Déconnexion forcée.", error);
+        // Si fetchUser échoue (token invalide/expiré), on force la déconnexion
+        this.forceLogout(false);
+        throw error;
       }
     },
 
     /**
-     * Déconnecte l'utilisateur.
+     * Logique de déconnexion principale (appelle l'API puis supprime l'état local).
      */
-    logout(shouldRedirect = true) {
+    async logout() {
+        try {
+            // 1. Appel au backend /logout pour tracer l'événement.
+            await authAPI.logout(); 
+        } catch (error) {
+            console.warn("Échec de l'appel /logout, mais déconnexion locale effectuée.", error);
+        } finally {
+            // 2. Suppression locale des données et redirection.
+            this.forceLogout();
+        }
+    },
+
+    /**
+     * Déconnecte l'utilisateur localement sans interaction API (utilisé en cas d'erreur de token).
+     */
+    forceLogout(shouldRedirect = true) {
       localStorage.removeItem('access_token');
       this.user = null;
+      
       if (shouldRedirect) {
         router.push({ name: 'login' });
       }
@@ -109,4 +127,3 @@ export const useAuthStore = defineStore('auth', {
     }
   },
 });
-// L'initialisation est désormais gérée uniquement dans main.js.

@@ -11,16 +11,13 @@ from datetime import datetime
 # -----------------------------
 # Configuration de la connexion
 # -----------------------------
-# DATABASE_URL pour se connecter à PostgreSQL via Docker
-# postgres: utilisateur
-# test1234: mot de passe défini pour ton DB
-# localhost: machine locale
-# 5432: port exposé par le container
-# grocery_db: nom de la base
-DATABASE_URL = "postgresql://postgres:test1234@localhost:5432/grocery_db"
+# NOUVELLE DATABASE_URL pour se connecter à PostgreSQL via Docker
+# Utilisateur: grocery_user, Mot de passe: grocery_pass
+DATABASE_URL = "postgresql://grocery_user:grocery_pass@localhost:5432/grocery_db"
 
 # Création de l'engine SQLAlchemy
-engine = create_engine(DATABASE_URL, echo=True)  # echo=True pour afficher le SQL généré
+# echo=False pour ne pas surcharger la console
+engine = create_engine(DATABASE_URL, echo=False) 
 
 # Session pour manipuler la base
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -38,7 +35,8 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, nullable=False, index=True)
     username = Column(String, unique=True, nullable=False, index=True)
-    hashed_password = Column(String, nullable=False)
+    # CORRECTION : Unification du nom de colonne à 'password'
+    password = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relations avec les autres tables
@@ -87,7 +85,7 @@ class Recipe(Base):
 def create_all_tables():
     print("Création des tables dans la base PostgreSQL...")
     Base.metadata.create_all(bind=engine)  # Crée toutes les tables si elles n'existent pas
-    print("✅ Toutes les tables ont été créées !")
+    print("✅ Toutes les tables ont été créées ou mises à jour !")
 
 
 # -----------------------------

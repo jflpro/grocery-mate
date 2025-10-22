@@ -14,19 +14,17 @@ import os
 # Sinon, on utilise une valeur par défaut (utile en développement local)
 SQLALCHEMY_DATABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql://postgres:test1234@localhost:5432/grocery_db"  # ✅ Base grocery_db (et non fridgeapp)
+    # FIX: La valeur par défaut est mise à jour pour correspondre aux identifiants du Docker Compose
+    "postgresql://grocery_user:grocery_pass@localhost:5432/grocery_db" 
 )
 
 # --- Création de l'engine SQLAlchemy ---
-# pool_pre_ping=True permet de vérifier que la connexion est toujours active avant chaque requête
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
     pool_pre_ping=True
 )
 
 # --- Création d'une session pour interagir avec la base ---
-# autocommit=False → les changements ne sont validés qu'après un commit()
-# autoflush=False → évite d'envoyer automatiquement les changements avant les requêtes
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # --- Base de départ pour tous les modèles SQLAlchemy ---
@@ -36,10 +34,35 @@ Base = declarative_base()
 def get_db():
     """
     Fonction utilitaire pour injecter une session de base de données dans les routes FastAPI.
-    Elle ouvre une session au début et la ferme automatiquement à la fin de la requête.
     """
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+
+# --- FONCTION DE CRÉATION DE TABLES (À EXÉCUTER UNE FOIS SEULEMENT) ---
+def create_db_tables_and_sync_schema():
+    """
+    Supprime toutes les tables puis les recrée.
+    
+    ATTENTION : Cette fonction EFFACE toutes vos données existantes.
+    """
+    # Importation locale pour éviter l'erreur d'importation circulaire
+    # Assurez-vous d'avoir un fichier `models.py` dans ce répertoire.
+    # L'importation doit être faite ici pour s'assurer que tous les modèles 
+    # sont enregistrés dans Base.metadata avant d'appeler create_all/drop_all.
+    from . import models 
+
+    print("WARNING: Dropping all tables and recreating schema...")
+    # 1. Supprime toutes les tables (DROP)
+    Base.metadata.drop_all(bind=engine)
+    # 2. Crée toutes les tables (CREATE)
+    Base.metadata.create_all(bind=engine)
+    print("Database schema synchronization complete.")
+
+# --------------------------------------------------------------------------------------
+# LIGNE À DÉCOMMENTER POUR L'EXÉCUTION UNIQUE
+# Cette ligne est DÉCOMMENTÉE pour créer vos tables !
+# --------------------------------------------------------------------------------------
+# create_db_tables_and_sync_schema()

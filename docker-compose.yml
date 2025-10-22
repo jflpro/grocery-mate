@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # 1. SERVICE DE BASE DE DONNÉES (PostgreSQL)
   postgres:
     image: postgres:15-alpine
     container_name: grocery_postgres
@@ -11,12 +12,60 @@ services:
     ports:
       - "5432:5432"
     volumes:
+      # Ceci assure la persistance des données
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U grocery_user"]
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
+  # 2. INTERFACE DE GESTION DE LA DB (pgAdmin)
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin
+    environment:
+      # L'email et le mot de passe pour vous connecter à pgAdmin
+      PGADMIN_DEFAULT_EMAIL: admin@grocerymate.com
+      PGADMIN_DEFAULT_PASSWORD: admin_password
+      # Configuration pour se connecter automatiquement au service 'postgres'
+      PGADMIN_SERVER_NAME: Grocery Mate DB (Auto-Config)
+      PGADMIN_SERVER_HOST: postgres
+      PGADMIN_SERVER_PORT: 5432
+      PGADMIN_SERVER_USER: grocery_user
+      PGADMIN_SERVER_PASSWORD: grocery_pass
+    ports:
+      - "8080:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    restart: unless-stopped
+
+  # 3. SERVICE DE L'APPLICATION WEB 
+  web:
+    build: . # Construit l'image à partir du Dockerfile dans le répertoire courant
+    container_name: grocery_web
+    # Commande de développement standard (à ajuster si votre framework est différent de Django)
+    command: python manage.py runserver 0.0.0.0:8000 
+    volumes:
+      - .:/app # Montage du répertoire local dans le conteneur
+    ports:
+      - "8000:8000" # Le port par défaut pour l'application
+    environment:
+      # IMPORTANT : Assurez-vous que votre application utilise ces variables pour se connecter à Postgres
+      DB_HOST: postgres # Le nom du service Docker Compose
+      DB_NAME: grocery_db
+      DB_USER: grocery_user
+      DB_PASSWORD: grocery_pass
+    depends_on:
+      postgres:
+        condition: service_healthy # Assure que la DB est prête avant de démarrer l'application
+    restart: unless-stopped
+
+# CETTE SECTION EST ALIGNÉE AVEC 'services:'
 volumes:
   postgres_data:
+  pgadmin_data:

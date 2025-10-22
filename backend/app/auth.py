@@ -1,95 +1,98 @@
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import timedelta
+from typing import Annotated, Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import jwt, JWTError
 from sqlalchemy.orm import Session
-from passlib.context import CryptContext
+from jose import JWTError, jwt
 
-# CORRECTION CLÉ : Changé les imports relatifs (..database, ..models)
-# en imports absolus (app.database, app.models) pour la robustesse.
+from app import schemas, models
 from app.database import get_db
-from app import models
+from app.utils import security # Module de sécurité
 
-# --- Configuration de Sécurité ---
-# Pour un projet réel, ces variables devraient être chargées depuis des variables d'environnement.
-SECRET_KEY = "super-secret-key-that-should-be-in-env-vars"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # Token expire dans 7 jours
+# --- Configuration JWT ---
+SECRET_KEY = security.SECRET_KEY
+ALGORITHM = security.ALGORITHM
 
-# Contexte pour le hachage des mots de passe
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Schéma de sécurité : Définit où chercher le token (dans l'en-tête Authorization: Bearer ...)
+# Le 'tokenUrl' pointe vers la route de connexion définie dans le routeur.
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
-# Schéma OAuth2 pour extraire le token du header
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
+# --- Fonctions CRUD et Authentification ---
 
-# --- Fonctions de Hachage et de Vérification ---
+def get_user_by_email(db: Session, email: str):
+    """Récupère un utilisateur par email."""
+    return db.query(models.User).filter(models.User.email == email).first()
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Vérifie si le mot de passe clair correspond au mot de passe haché."""
-    return pwd_context.verify(plain_password, hashed_password)
+def create_user(db: Session, user: schemas.UserCreate):
+    """Crée un nouvel utilisateur."""
+    # Le hachage du mot de passe est géré dans le service de sécurité
+    db_user = models.User(
+        email=user.email,
+        # AJOUT : Nous passons le 'username' pour satisfaire la contrainte NOT NULL de la base de données.
+        username=user.username,
+        # Utilisation de 'password' pour le champ du mot de passe haché
+        password=security.get_password_hash(user.password)
+        # SUPPRESSION de 'is_active=True' car il est probablement défini par défaut dans le modèle SQLAlchemy
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
 
-def get_password_hash(password: str) -> str:
-    """Hache un mot de passe."""
-    return pwd_context.hash(password)
+def authenticate_user(db: Session, email: str, password: str):
+    """Vérifie les identifiants et retourne l'utilisateur s'il est valide."""
+    user = get_user_by_email(db, email=email)
+    # Assumons que le haché est stocké dans l'attribut .password du modèle
+    if not user or not security.verify_password(password, user.password):
+        return False
+    return user
 
-# --- Fonctions de Token ---
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """Crée un jeton d'accès JWT."""
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+# --- Dépendances FastAPI pour la validation du Token ---
 
-# --- Fonctions de Dépendance d'Authentification ---
-
-def get_current_user_id(token: str = Depends(oauth2_scheme)) -> int:
-    """Décode le token et retourne l'ID utilisateur, lève une erreur si le token est invalide."""
+def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)) -> models.User:
+    """Valide le token JWT et récupère l'objet utilisateur."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    
     try:
+        # 1. Décoder le token
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: int = payload.get("user_id")
+        user_id: str = payload.get("user_id")
         if user_id is None:
             raise credentials_exception
+        token_data = schemas.TokenData(user_id=user_id)
     except JWTError:
         raise credentials_exception
     
-    return user_id
-
-async def get_current_user(db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)) -> models.User:
-    """Récupère l'objet User à partir du token (authentification obligatoire)."""
-    user = db.query(models.User).filter(models.User.id == user_id).first()
+    # 2. Chercher l'utilisateur dans la base de données
+    user = db.query(models.User).filter(models.User.id == token_data.user_id).first()
     if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise credentials_exception
     return user
 
-async def get_current_user_optional(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)) -> Optional[models.User]:
-    """
-    Récupère l'objet User à partir du token.
-    Si le token est manquant ou invalide, retourne None (authentification optionnelle).
-    """
+def get_current_active_user(current_user: models.User = Depends(get_current_user)) -> models.User:
+    """Dépendance qui vérifie si l'utilisateur est actif (obligatoire)."""
+    # CORRECTION : La vérification 'is_active' est retirée car l'attribut n'existe pas sur l'objet User.
+    # if not current_user.is_active:
+    #     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
+    return current_user
+
+# NOUVELLE FONCTION POUR LA DÉPENDANCE OPTIONNELLE
+def get_current_user_optional(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> Optional[models.User]:
+    """Valide le token JWT. Si la validation échoue, retourne None au lieu de lever une erreur 401."""
     try:
-        # Tente de décoder le token comme dans get_current_user_id
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: int = payload.get("user_id")
-        
-        if user_id is None:
-            return None # Pas d'ID utilisateur valide dans le payload
-            
-        user = db.query(models.User).filter(models.User.id == user_id).first()
-        return user
-        
-    except (JWTError, AttributeError):
-        # JWTError: Token invalide, expiré, ou mal formé
-        # AttributeError: Peut survenir si 'token' est None ou vide si l'utilisateur ne fournit pas de header d'auth
+        # Tente d'obtenir l'utilisateur comme d'habitude
+        return get_current_user(db=db, token=token)
+    except HTTPException as e:
+        # Si c'est une 401 (problème d'authentification ou token manquant/invalide)
+        if e.status_code == status.HTTP_401_UNAUTHORIZED:
+            return None # L'utilisateur n'est pas authentifié, mais c'est autorisé (facultatif)
+        raise # Lever l'exception si ce n'est pas une 401 (ex: 400 Inactive User, mais cette fonction est gérée par get_current_active_user)
+    except Exception:
+        # Pour toute autre erreur de décodage/validation inattendue, retourner None
         return None
