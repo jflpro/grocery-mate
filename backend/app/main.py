@@ -18,9 +18,12 @@ app = FastAPI(
 # Permet au frontend de communiquer avec le backend, même si ports différents
 origins = [
     "http://localhost:5173",           # Frontend Vite local
-    "http://127.0.0.1:5173",           # Variante localhost
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",           # Nouveau port Vite détecté
+    "http://127.0.0.1:5174",
     "http://localhost:3000",           # Si React ou autre port utilisé
-    "http://host.docker.internal:5173" # Frontend Docker
+    "http://host.docker.internal:5173",
+    "http://host.docker.internal:5174"
 ]
 
 app.add_middleware(

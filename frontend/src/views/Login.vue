@@ -1,9 +1,14 @@
 <script setup>
 import { ref } from 'vue';
 import { useAuthStore } from '@/stores/auth';
-import router from '@/router';
+import { useRoute, useRouter } from 'vue-router';
 
+// --- 1. Initialisation du store Pinia et du routeur ---
 const authStore = useAuthStore();
+const router = useRouter();
+const route = useRoute();
+
+// --- 2. Champs du formulaire ---
 const email = ref('');
 const password = ref('');
 const isLoading = ref(false);
@@ -18,79 +23,79 @@ const handleLogin = async () => {
     error.value = null;
 
     try {
-        // L'action login du store utilise 'username' comme clé pour l'email
+        // Redirection vers la page demandée après connexion
+        const redirectPath = route.query.redirect || null;
+
+        // L'action login du store utilise 'username' comme clé
         await authStore.login({ 
             username: email.value, 
-            password: password.value 
+            password: password.value,
+            redirectPath
         });
-        
-        // Si le login est réussi, le store gère la redirection vers 'home'
-        // Nous n'avons rien d'autre à faire ici.
 
     } catch (err) {
-        // Capturer l'erreur pour l'afficher à l'utilisateur
         const errorMessage = err.response?.data?.detail || 'Erreur de connexion inconnue. Vérifiez vos identifiants.';
         error.value = errorMessage;
-        console.error("Échec de la connexion (affichage utilisateur):", errorMessage);
-        
-        // S'assurer que la déconnexion a lieu en cas d'échec (même si le store le fait déjà)
-        authStore.logout(false); 
+        console.error("Échec de la connexion:", errorMessage);
+
+        // Nettoyage de l'état en cas d'échec
+        authStore.forceLogout(false);
     } finally {
         isLoading.value = false;
     }
 };
-
 </script>
 
 <template>
   <div class="flex items-center justify-center min-h-screen bg-gray-50 p-4">
     <div class="w-full max-w-md bg-white p-8 rounded-xl shadow-2xl border border-gray-100">
 
+      <!-- Titre -->
       <h2 class="text-3xl font-extrabold text-center text-indigo-700 mb-6">
         Se Connecter
       </h2>
 
+      <!-- Formulaire de login -->
       <form @submit.prevent="handleLogin" class="space-y-6">
-        <!-- Champ Email -->
+        
+        <!-- Email -->
         <div>
           <label for="email" class="block text-sm font-medium text-gray-700">Adresse Email</label>
           <div class="mt-1">
             <input
               id="email"
-              name="email"
               type="email"
               v-model="email"
               required
               autocomplete="email"
-              class="appearance-none block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out sm:text-sm"
               placeholder="votre.email@exemple.com"
+              class="appearance-none block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out sm:text-sm"
             />
           </div>
         </div>
 
-        <!-- Champ Mot de passe -->
+        <!-- Mot de passe -->
         <div>
           <label for="password" class="block text-sm font-medium text-gray-700">Mot de Passe</label>
           <div class="mt-1">
             <input
               id="password"
-              name="password"
               type="password"
               v-model="password"
               required
               autocomplete="current-password"
-              class="appearance-none block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out sm:text-sm"
               placeholder="••••••••"
+              class="appearance-none block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out sm:text-sm"
             />
           </div>
         </div>
 
-        <!-- Message d'erreur (si présent) -->
+        <!-- Message d'erreur -->
         <p v-if="error" class="text-sm font-medium text-red-600 text-center bg-red-50 p-2 rounded-lg border border-red-200">
           {{ error }}
         </p>
 
-        <!-- Bouton de connexion -->
+        <!-- Bouton -->
         <div>
           <button
             type="submit"
@@ -103,6 +108,7 @@ const handleLogin = async () => {
         </div>
       </form>
 
+      <!-- Lien vers inscription -->
       <div class="mt-6 text-center">
         <p class="text-sm text-gray-600">
           Pas encore de compte ?
@@ -115,3 +121,13 @@ const handleLogin = async () => {
     </div>
   </div>
 </template>
+
+<style scoped>
+body {
+    font-family: Arial, sans-serif;
+}
+.router-link-exact-active {
+    font-weight: bold;
+    text-decoration: underline;
+}
+</style>

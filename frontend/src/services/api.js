@@ -1,10 +1,10 @@
 import axios from "axios";
 
 // 🌐 URL de base du backend
-// Si le frontend tourne dans Docker, utiliser host.docker.internal
-const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://host.docker.internal:8000/api";
+// On prend d'abord l'URL du .env (VITE_BACKEND_URL), sinon fallback dev
+const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000/api";
 
-// 1️⃣ Création de l'instance Axios principale
+// --- Instance Axios principale ---
 const api = axios.create({
   baseURL: API_BASE,
   headers: {
@@ -12,7 +12,7 @@ const api = axios.create({
   },
 });
 
-// 2️⃣ Intercepteur pour ajouter le token à chaque requête si présent
+// --- Intercepteur pour ajouter le token à chaque requête ---
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("access_token");
@@ -24,10 +24,9 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// 3️⃣ Export de l'instance Axios par défaut
 export default api;
 
-// 🛒 --- Shopping Lists API ---
+// --- Shopping Lists API ---
 export const shoppingListsAPI = {
   getAll: () => api.get(`/shopping-lists/`),
   add: (data) => api.post(`/shopping-lists/`, data),
@@ -38,7 +37,7 @@ export const shoppingListsAPI = {
   deleteItem: (itemId) => api.delete(`/shopping-lists/items/${itemId}`),
 };
 
-// 🍄 --- Ingredients API ---
+// --- Ingredients API ---
 export const ingredientsAPI = {
   getAll: () => api.get(`/ingredients/`),
   add: (data) => api.post(`/ingredients/`, data),
@@ -48,7 +47,7 @@ export const ingredientsAPI = {
   seedSample: () => api.post(`/ingredients/seed-sample`),
 };
 
-// 🍽️ --- Recipes API ---
+// --- Recipes API ---
 export const recipesAPI = {
   getAll: () => api.get(`/recipes/`),
   add: (data) => api.post(`/recipes/`, data),
@@ -58,14 +57,26 @@ export const recipesAPI = {
   seedSample: () => api.post(`/recipes/seed-sample`),
 };
 
-// 🔑 --- Auth API ---
+// --- Auth API ---
 export const authAPI = {
   register: (data) => api.post(`/auth/register`, data),
+
+  // Login avec OAuth2 password (x-www-form-urlencoded)
+  login: (email, password) => {
+    const formData = new URLSearchParams();
+    formData.append("username", email); // backend attend email dans "username"
+    formData.append("password", password);
+
+    return api.post(`/auth/token`, formData, {
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+  },
+
   me: () => api.get(`/auth/me`),
   logout: () => api.post(`/auth/logout`),
 };
 
-// 🧪 --- Seed global (données de test) ---
+// --- Seed global (données de test) ---
 export const seedAPI = {
   seedAll: () => api.post(`/seed/`),
 };
