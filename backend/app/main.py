@@ -15,21 +15,27 @@ app = FastAPI(
 )
 
 # --- Middleware CORS ---
-# Permet au frontend (http://localhost:5173 ou 3000) de communiquer avec l'API
+# Permet au frontend de communiquer avec le backend, même si ports différents
+origins = [
+    "http://localhost:5173",           # Frontend Vite local
+    "http://127.0.0.1:5173",           # Variante localhost
+    "http://localhost:3000",           # Si React ou autre port utilisé
+    "http://host.docker.internal:5173" # Frontend Docker
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=origins,    # Origines autorisées
+    allow_credentials=True,   # Permet cookies/headers auth
+    allow_methods=["*"],      # Toutes les méthodes HTTP (GET, POST, PUT, DELETE…)
+    allow_headers=["*"],      # Tous les headers autorisés
 )
 
 # --- Inclusion des routes avec le préfixe /api ---
-# Chaque router gère une section spécifique de l'application
 app.include_router(ingredients.router, prefix="/api")
 app.include_router(recipes.router, prefix="/api")
 app.include_router(shopping_lists.router, prefix="/api")
-app.include_router(seed.router, prefix="/api") # Router pour les données initiales/de test
+app.include_router(seed.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
 
 # --- Route principale (page d'accueil API) ---
@@ -39,7 +45,7 @@ def read_root():
         "message": "Welcome to GroceryMate API",
         "docs": "/docs",
         "redoc": "/redoc",
-        "seed_endpoint": "/api/seed/" # Redirection vers l'endpoint du seeder
+        "seed_endpoint": "/api/seed/"
     }
 
 # --- Vérification de santé (health check) ---
