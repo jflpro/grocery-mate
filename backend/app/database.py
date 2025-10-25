@@ -10,13 +10,15 @@ import os
 
 # --- Configuration de la Base de Données (PostgreSQL) ---
 
-# 🔧 On tente d'abord de récupérer l'URL depuis les variables d'environnement
-# Sinon, on utilise une valeur par défaut (utile en développement local)
-SQLALCHEMY_DATABASE_URL = os.environ.get(
-    "DATABASE_URL",
-    # FIX: La valeur par défaut est mise à jour pour correspondre aux identifiants du Docker Compose
-    "postgresql://grocery_user:grocery_pass@localhost:5432/grocery_db" 
-)
+# 🔧 Récupération des variables d'environnement si disponibles
+DB_USER = os.environ.get("DB_USER", "grocery_user")
+DB_PASSWORD = os.environ.get("DB_PASSWORD", "grocery_pass")
+DB_NAME = os.environ.get("DB_NAME", "grocery_db")
+DB_HOST = os.environ.get("DB_HOST", "localhost")  # "localhost" pour venv, "postgres" dans Docker
+DB_PORT = os.environ.get("DB_PORT", "5432")
+
+# --- Construction de l'URL SQLAlchemy ---
+SQLALCHEMY_DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 # --- Création de l'engine SQLAlchemy ---
 engine = create_engine(
@@ -45,24 +47,17 @@ def get_db():
 def create_db_tables_and_sync_schema():
     """
     Supprime toutes les tables puis les recrée.
-    
+
     ATTENTION : Cette fonction EFFACE toutes vos données existantes.
     """
-    # Importation locale pour éviter l'erreur d'importation circulaire
-    # Assurez-vous d'avoir un fichier `models.py` dans ce répertoire.
-    # L'importation doit être faite ici pour s'assurer que tous les modèles 
-    # sont enregistrés dans Base.metadata avant d'appeler create_all/drop_all.
-    from . import models 
+    from . import models  # Import local pour éviter l'import circulaire
 
     print("WARNING: Dropping all tables and recreating schema...")
-    # 1. Supprime toutes les tables (DROP)
     Base.metadata.drop_all(bind=engine)
-    # 2. Crée toutes les tables (CREATE)
     Base.metadata.create_all(bind=engine)
     print("Database schema synchronization complete.")
 
 # --------------------------------------------------------------------------------------
-# LIGNE À DÉCOMMENTER POUR L'EXÉCUTION UNIQUE
-# Cette ligne est DÉCOMMENTÉE pour créer vos tables !
+# DÉCOMMENTER POUR CRÉER LES TABLES (une seule fois)
 # --------------------------------------------------------------------------------------
 # create_db_tables_and_sync_schema()
