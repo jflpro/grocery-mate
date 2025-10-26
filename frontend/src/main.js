@@ -12,14 +12,14 @@ const app = createApp(App);
 
 // 3. Création de l'instance Pinia
 const pinia = createPinia();
-
-// Utilisation des middlewares
 app.use(pinia);
 app.use(router);
 
+// --- TEST .env ---
+console.log("VITE_BACKEND_URL:", import.meta.env.VITE_BACKEND_URL); 
+// Si undefined -> ton fichier .env n'est pas détecté
+
 // --- Initialisation de l'authentification ---
-// Doit être fait après 'app.use(pinia)'
-// On crée l'instance du store pour pouvoir appeler l'action d'initialisation
 const authStore = useAuthStore();
 authStore.initializeAuth(); 
 

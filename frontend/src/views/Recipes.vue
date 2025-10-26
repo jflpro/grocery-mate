@@ -1,147 +1,213 @@
+<script setup>
+import { ref, onMounted } from "vue";
+import { recipesAPI, ingredientsAPI } from "@/services/api.js";
+
+const recipes = ref([]);
+const ingredients = ref([]);
+const isLoading = ref(false);
+
+const showCreateModal = ref(false);
+const showEditModal = ref(false);
+const showConfirmDeleteModal = ref(false);
+
+const newRecipe = ref({
+  title: "",
+  description: "",
+  ingredient_ids: [],
+});
+const editingRecipe = ref(null);
+const deletingRecipeId = ref(null);
+
+const loadIngredients = async () => {
+  try {
+    const res = await ingredientsAPI.getAll();
+    ingredients.value = res.data;
+  } catch (error) {
+    console.error("Erreur chargement ingrédients:", error);
+  }
+};
+
+const loadRecipes = async () => {
+  isLoading.value = true;
+  try {
+    const res = await recipesAPI.getAll();
+    recipes.value = res.data;
+  } catch (error) {
+    console.error("Erreur chargement recettes:", error);
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+const createRecipe = async () => {
+  if (!newRecipe.value.title.trim()) return;
+  try {
+    await recipesAPI.add(newRecipe.value);
+    closeCreateModal();
+    await loadRecipes();
+  } catch (error) {
+    console.error("Erreur création recette:", error);
+  }
+};
+
+const openEditModal = (recipe) => {
+  editingRecipe.value = { ...recipe, ingredient_ids: recipe.ingredients.map(i => i.id) };
+  showEditModal.value = true;
+};
+
+const saveEditRecipe = async () => {
+  if (!editingRecipe.value.title.trim()) return;
+  try {
+    await recipesAPI.update(editingRecipe.value.id, editingRecipe.value);
+    closeEditModal();
+    await loadRecipes();
+  } catch (error) {
+    console.error("Erreur modification recette:", error);
+  }
+};
+
+const openDeleteConfirm = (id) => {
+  deletingRecipeId.value = id;
+  showConfirmDeleteModal.value = true;
+};
+
+const deleteRecipe = async () => {
+  try {
+    await recipesAPI.delete(deletingRecipeId.value);
+    closeDeleteConfirm();
+    await loadRecipes();
+  } catch (error) {
+    console.error("Erreur suppression recette:", error);
+  }
+};
+
+const resetNewRecipe = () => ({
+  title: "",
+  description: "",
+  ingredient_ids: [],
+});
+
+const closeCreateModal = () => {
+  showCreateModal.value = false;
+  newRecipe.value = resetNewRecipe();
+};
+const closeEditModal = () => {
+  showEditModal.value = false;
+  editingRecipe.value = null;
+};
+const closeDeleteConfirm = () => {
+  showConfirmDeleteModal.value = false;
+  deletingRecipeId.value = null;
+};
+
+onMounted(async () => {
+  await loadIngredients();
+  await loadRecipes();
+});
+</script>
+
 <template>
-  <div class="px-4 py-6 sm:px-0 bg-gray-50 min-h-full">
+<div class="px-4 py-6 sm:px-0 bg-gray-50 min-h-full">
 
-    <!-- Header -->
-    <div class="flex flex-col sm:flex-row justify-between items-center mb-6">
-      <h2 class="text-3xl font-bold text-gray-900">Mes Recettes</h2>
-      <div class="flex space-x-3 mt-4 sm:mt-0">
-        <button
-          @click="findMatchingRecipes"
-          class="inline-flex items-center px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-md shadow hover:bg-primary-700 transition"
-        >
-          🔍 Recettes disponibles
-        </button>
-        <button
-          @click="seedSampleRecipes"
-          class="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-md bg-white hover:bg-gray-50 transition"
-        >
-          📚 Recettes exemple
-        </button>
-      </div>
-    </div>
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row justify-between items-center mb-8 border-b pb-4">
+    <h1 class="text-4xl font-bold text-gray-900">Mes Recettes</h1>
+    <button @click="showCreateModal = true"
+      class="flex items-center px-5 py-2 bg-primary-600 text-white font-semibold rounded-md shadow hover:bg-primary-700 transition duration-150 transform hover:scale-105 mt-4 sm:mt-0">
+      Ajouter une Recette
+    </button>
+  </div>
 
-    <!-- Healthy Filter -->
-    <div class="mb-6">
-      <button
-        @click="showHealthyOnly = !showHealthyOnly"
-        :class="showHealthyOnly ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'"
-        class="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium"
-      >
-        {{ showHealthyOnly ? '✓' : '' }} Healthy Recipes Only
-      </button>
-    </div>
+  <!-- État de chargement / vide -->
+  <div v-if="isLoading" class="text-center py-10 text-xl text-primary-600">
+    Chargement des recettes...
+  </div>
+  <div v-else-if="!recipes.length" class="text-center py-10 text-gray-500 italic text-lg bg-white rounded-lg shadow-md">
+    Aucune recette pour le moment. Ajoutez-en pour commencer !
+  </div>
 
-    <!-- Matching Recipes Alert -->
-    <div v-if="showMatchingOnly" class="bg-green-50 border-l-4 border-green-400 p-4 mb-6 rounded-md shadow">
-      <div class="flex items-start">
-        <svg class="h-5 w-5 text-green-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-        </svg>
-        <p class="ml-3 text-sm text-green-700">
-          Showing recipes you can make with your available ingredients! 
-          <button @click="showMatchingOnly = false" class="font-medium underline">Show all recipes</button>
-        </p>
-      </div>
-    </div>
-
-    <!-- Recipes Grid -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-      <div v-for="recipe in displayedRecipes" :key="recipe.id" class="bg-white rounded-lg shadow hover:shadow-lg transition">
-        <div class="p-6">
-          <div class="flex items-center justify-between mb-3">
-            <h3 class="text-xl font-semibold text-gray-900">{{ recipe.name }}</h3>
-            <span v-if="recipe.is_healthy" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-              Healthy
+  <!-- Liste des recettes -->
+  <div v-else class="space-y-4">
+    <div v-for="recipe in recipes" :key="recipe.id" class="bg-white p-4 rounded-lg shadow hover:shadow-lg transition">
+      <div class="flex justify-between items-start">
+        <div>
+          <h2 class="text-xl font-semibold text-gray-900">{{ recipe.title }}</h2>
+          <p class="text-gray-600 mt-1">{{ recipe.description }}</p>
+          <p class="text-gray-500 mt-2 text-sm">
+            <span v-for="ing in recipe.ingredients" :key="ing.id" class="inline-block bg-gray-100 text-gray-800 px-2 py-1 rounded-full mr-2 mb-1">
+              {{ ing.name }} ({{ ing.quantity }} {{ ing.unit }})
             </span>
-          </div>
-          <p class="text-gray-600 text-sm mb-4">{{ recipe.description }}</p>
-          <div class="space-y-2 mb-4 text-sm text-gray-500">
-            <div class="flex items-center">
-              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Prep time: {{ recipe.prep_time }} min
-            </div>
-            <div class="flex items-center">
-              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-              Servings: {{ recipe.servings }}
-            </div>
-            <div v-if="recipe.calories" class="flex items-center">
-              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              Calories: {{ recipe.calories }}
-            </div>
-          </div>
-          <button
-            @click="viewRecipe(recipe)"
-            class="w-full px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-md hover:bg-primary-700 transition"
-          >
-            View Recipe
+          </p>
+        </div>
+        <div class="flex space-x-2">
+          <button @click="openEditModal(recipe)" class="text-primary-600 hover:text-primary-900 p-1 rounded-full hover:bg-primary-50 transition">
+            Modifier
+          </button>
+          <button @click="openDeleteConfirm(recipe.id)" class="text-red-600 hover:text-red-900 p-1 rounded-full hover:bg-red-50 transition">
+            Supprimer
           </button>
         </div>
       </div>
     </div>
+  </div>
 
-    <div v-if="displayedRecipes.length === 0" class="text-center py-12 bg-white rounded-lg shadow mt-6">
-      <p class="text-gray-500">No recipes found. Try loading sample recipes or adjust your filters!</p>
-    </div>
-
-    <!-- Recipe Detail Modal -->
-    <Transition name="modal-fade">
-      <div v-if="selectedRecipe" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-600 bg-opacity-75">
-        <div class="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full transform transition-all">
-          <h3 class="text-lg font-medium text-gray-900">{{ selectedRecipe.name }}</h3>
-          <p class="text-sm text-gray-500 mb-4">{{ selectedRecipe.description }}</p>
-          <ul class="text-sm text-gray-500 list-disc list-inside">
-            <li v-for="ingredient in selectedRecipe.ingredients" :key="ingredient.id">
-              {{ ingredient.name }} - {{ ingredient.quantity }}
-            </li>
-          </ul>
-          <div class="mt-5 flex justify-end">
-            <button @click="selectedRecipe = null" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50">
-              Close
-            </button>
+  <!-- Modaux Créer / Éditer / Supprimer -->
+  <Transition name="modal-fade">
+    <div v-if="showCreateModal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
+      <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-lg transform transition-all">
+        <h3 class="text-2xl font-bold text-gray-900 mb-4">Ajouter une Recette</h3>
+        <form @submit.prevent="createRecipe" class="space-y-4">
+          <input v-model="newRecipe.title" type="text" placeholder="Titre" required class="w-full border p-2 rounded-md">
+          <textarea v-model="newRecipe.description" placeholder="Description" rows="3" class="w-full border p-2 rounded-md"></textarea>
+          <div>
+            <label class="block font-medium mb-1">Ingrédients :</label>
+            <select v-model="newRecipe.ingredient_ids" multiple class="w-full border p-2 rounded-md">
+              <option v-for="ing in ingredients" :key="ing.id" :value="ing.id">{{ ing.name }}</option>
+            </select>
           </div>
+          <div class="flex justify-end space-x-2">
+            <button type="button" @click="closeCreateModal" class="px-4 py-2 bg-gray-200 rounded-md">Annuler</button>
+            <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded-md">Créer</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </Transition>
+
+  <Transition name="modal-fade">
+    <div v-if="showEditModal && editingRecipe" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
+      <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-lg transform transition-all">
+        <h3 class="text-2xl font-bold text-gray-900 mb-4">Modifier : {{ editingRecipe.title }}</h3>
+        <form @submit.prevent="saveEditRecipe" class="space-y-4">
+          <input v-model="editingRecipe.title" type="text" required class="w-full border p-2 rounded-md">
+          <textarea v-model="editingRecipe.description" rows="3" class="w-full border p-2 rounded-md"></textarea>
+          <div>
+            <label class="block font-medium mb-1">Ingrédients :</label>
+            <select v-model="editingRecipe.ingredient_ids" multiple class="w-full border p-2 rounded-md">
+              <option v-for="ing in ingredients" :key="ing.id" :value="ing.id">{{ ing.name }}</option>
+            </select>
+          </div>
+          <div class="flex justify-end space-x-2">
+            <button type="button" @click="closeEditModal" class="px-4 py-2 bg-gray-200 rounded-md">Annuler</button>
+            <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded-md">Enregistrer</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </Transition>
+
+  <Transition name="modal-fade">
+    <div v-if="showConfirmDeleteModal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
+      <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md transform transition-all text-center">
+        <h3 class="text-xl font-bold text-gray-900 mb-4">Confirmer la suppression</h3>
+        <p class="mb-6">Êtes-vous sûr de vouloir supprimer cette recette ?</p>
+        <div class="flex justify-center space-x-4">
+          <button @click="closeDeleteConfirm" class="px-4 py-2 bg-gray-200 rounded-md">Annuler</button>
+          <button @click="deleteRecipe" class="px-4 py-2 bg-red-600 text-white rounded-md">Supprimer</button>
         </div>
       </div>
-    </Transition>
+    </div>
+  </Transition>
 
-  </div>
+</div>
 </template>
-
-<script>
-import { ref } from "vue";
-
-export default {
-  setup() {
-    const displayedRecipes = ref([]);
-    const selectedRecipe = ref(null);
-    const showHealthyOnly = ref(false);
-    const showMatchingOnly = ref(false);
-
-    const viewRecipe = (recipe) => {
-      selectedRecipe.value = recipe;
-    };
-    const findMatchingRecipes = () => {};
-    const seedSampleRecipes = () => {};
-
-    return {
-      displayedRecipes,
-      selectedRecipe,
-      showHealthyOnly,
-      showMatchingOnly,
-      viewRecipe,
-      findMatchingRecipes,
-      seedSampleRecipes
-    };
-  }
-};
-</script>
-
-<style scoped>
-.modal-fade-enter-active, .modal-fade-leave-active { transition: opacity 0.3s ease; }
-.modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
-</style>
