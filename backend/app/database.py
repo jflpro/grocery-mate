@@ -14,7 +14,7 @@ import os
 DB_USER = os.environ.get("DB_USER", "grocery_user")
 DB_PASSWORD = os.environ.get("DB_PASSWORD", "grocery_pass")
 DB_NAME = os.environ.get("DB_NAME", "grocery_db")
-DB_HOST = os.environ.get("DB_HOST", "localhost")  # "localhost" pour venv, "postgres" dans Docker
+DB_HOST = os.environ.get("DB_HOST", "postgres")  # "localhost" pour venv, "postgres" dans Docker
 DB_PORT = os.environ.get("DB_PORT", "5432")
 
 # --- Construction de l'URL SQLAlchemy ---

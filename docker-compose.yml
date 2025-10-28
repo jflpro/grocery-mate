@@ -1,39 +1,38 @@
+version: "3.9"
+
 services:
   # ------------------------------------------------------------
   # 1️⃣ SERVICE DE BASE DE DONNÉES (PostgreSQL)
   # ------------------------------------------------------------
   postgres:
-    image: postgres:15-alpine
+    image: postgres:16
     container_name: grocery_postgres
     environment:
       POSTGRES_USER: grocery_user
       POSTGRES_PASSWORD: grocery_pass
       POSTGRES_DB: grocery_db
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U grocery_user"]
+      test: ["CMD-SHELL", "pg_isready -U grocery_user -d grocery_db"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - devnet
     restart: unless-stopped
 
   # ------------------------------------------------------------
   # 2️⃣ INTERFACE DE GESTION DE LA DB (pgAdmin)
   # ------------------------------------------------------------
   pgadmin:
-    image: dpage/pgadmin4
+    image: dpage/pgadmin4:latest
     container_name: pgadmin
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@grocerymate.com
       PGADMIN_DEFAULT_PASSWORD: admin_password
-      PGADMIN_SERVER_NAME: Grocery Mate DB (Auto-Config)
-      PGADMIN_SERVER_HOST: postgres
-      PGADMIN_SERVER_PORT: 5432
-      PGADMIN_SERVER_USER: grocery_user
-      PGADMIN_SERVER_PASSWORD: grocery_pass
+      # 🔹 Auto-connect to PostgreSQL
+      PGADMIN_CONFIG_SERVER_MODE: "True"
     ports:
       - "8080:80"
     depends_on:
@@ -41,6 +40,9 @@ services:
         condition: service_healthy
     volumes:
       - pgadmin_data:/var/lib/pgadmin
+      - ./pgadmin_servers.json:/pgadmin4/servers.json:ro   # fichier JSON pour auto-configuration
+    networks:
+      - devnet
     restart: unless-stopped
 
   # ------------------------------------------------------------
@@ -49,12 +51,15 @@ services:
   backend:
     build:
       context: ./backend
+      dockerfile: Dockerfile
     container_name: grocery_backend
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
       - ./backend:/app
     ports:
       - "8000:8000"
+    env_file:
+      - ./backend/.env
     environment:
       DB_HOST: postgres
       DB_USER: grocery_user
@@ -63,6 +68,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - devnet
     restart: unless-stopped
 
   # ------------------------------------------------------------
@@ -71,14 +78,41 @@ services:
   frontend:
     build:
       context: ./frontend
+      dockerfile: Dockerfile
     container_name: grocery_frontend
     command: npm run dev -- --host 0.0.0.0
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     ports:
       - "5173:5173"
-    volumes:
-      - ./frontend:/app                 # Monte le code local
-      - /app/node_modules               # Préserve les node_modules du conteneur
+    networks:
+      - devnet
     restart: unless-stopped
+
+  # ------------------------------------------------------------
+  # 5️⃣ NGINX PROXY MANAGER (Pour gérer les DNS et HTTPS)
+  # ------------------------------------------------------------
+  nginx-proxy-manager:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: nginx_proxy_manager
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "81:81"
+      - "443:443"
+    volumes:
+      - /srv/dockerdata/nginx/data:/data
+      - /srv/dockerdata/nginx/letsencrypt:/etc/letsencrypt
+    networks:
+      - devnet
+
+# ------------------------------------------------------------
+# RÉSEAU COMMUN
+# ------------------------------------------------------------
+networks:
+  devnet:
+    driver: bridge
 
 # ------------------------------------------------------------
 # VOLUMES POUR PERSISTANCE

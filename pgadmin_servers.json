@@ -1,0 +1,13 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "GroceryPostgres",
+      "Group": "Grocery",
+      "Host": "grocery_postgres",
+      "Port": 5432,
+      "MaintenanceDB": "grocery_db",
+      "Username": "grocery_user",
+      "SSLMode": "prefer"
+    }
+  }
+}
