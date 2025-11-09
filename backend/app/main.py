@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import engine, Base
-from app.routers import ingredients, recipes, shopping_lists, seed, auth
+from app.routers import ingredients, recipes, shopping_lists, seed, auth, newsletter
 
 # --- Création des tables à partir des modèles SQLAlchemy ---
 Base.metadata.create_all(bind=engine)
@@ -40,6 +40,7 @@ app.include_router(recipes.router, prefix="/api")
 app.include_router(shopping_lists.router, prefix="/api")
 app.include_router(seed.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
+app.include_router(newsletter.router, prefix="/api")
 
 # --- Route principale (page d'accueil API) ---
 @app.get("/")

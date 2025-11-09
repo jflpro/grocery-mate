@@ -34,7 +34,7 @@ services:
       # 🔹 Auto-connect to PostgreSQL
       PGADMIN_CONFIG_SERVER_MODE: "True"
     ports:
-      - "8080:80"
+      - "8082:80"
     depends_on:
       postgres:
         condition: service_healthy
@@ -98,9 +98,9 @@ services:
     container_name: nginx_proxy_manager
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "81:81"
-      - "443:443"
+      - "8081:80"
+      - "8181:81"
+      - "4443:443"
     volumes:
       - /srv/dockerdata/nginx/data:/data
       - /srv/dockerdata/nginx/letsencrypt:/etc/letsencrypt
