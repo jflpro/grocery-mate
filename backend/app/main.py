@@ -1,11 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database import engine, Base
+from app.database import create_db_tables_if_not_exists
 from app.routers import ingredients, recipes, shopping_lists, seed, auth, newsletter
 
-# --- Création des tables à partir des modèles SQLAlchemy ---
-Base.metadata.create_all(bind=engine)
+# --- Création des tables manquantes (sécurisé pour production) ---
+create_db_tables_if_not_exists()
 
 # --- Initialisation de l'application FastAPI ---
 app = FastAPI(
@@ -15,23 +15,21 @@ app = FastAPI(
 )
 
 # --- Middleware CORS ---
-# Permet au frontend de communiquer avec le backend, même si ports différents
+# Autorise le frontend à accéder au backend dans Docker
 origins = [
-    "http://localhost:5173",           # Frontend Vite local
-    "http://127.0.0.1:5173",
-    "http://localhost:5174",           # Nouveau port Vite détecté
-    "http://127.0.0.1:5174",
-    "http://localhost:3000",           # Si React ou autre port utilisé
-    "http://host.docker.internal:5173",
-    "http://host.docker.internal:5174"
+    "http://localhost:5173",              # Frontend local
+    "http://127.0.0.1:5173",             # Variante loopback
+    "http://grocery_frontend:5173",      # Nom du service Docker du frontend
+    "http://grocery_backend:8000",       # Pour tests inter-conteneurs
+    "http://host.docker.internal:5173",  # Cas Docker Desktop Windows/macOS
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,    # Origines autorisées
-    allow_credentials=True,   # Permet cookies/headers auth
-    allow_methods=["*"],      # Toutes les méthodes HTTP (GET, POST, PUT, DELETE…)
-    allow_headers=["*"],      # Tous les headers autorisés
+    allow_origins=origins,     # Limité à ces origines
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # --- Inclusion des routes avec le préfixe /api ---
@@ -42,7 +40,7 @@ app.include_router(seed.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
 app.include_router(newsletter.router, prefix="/api")
 
-# --- Route principale (page d'accueil API) ---
+# --- Route principale ---
 @app.get("/")
 def read_root():
     return {
@@ -52,7 +50,7 @@ def read_root():
         "seed_endpoint": "/api/seed/"
     }
 
-# --- Vérification de santé (health check) ---
+# --- Vérification de santé ---
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}

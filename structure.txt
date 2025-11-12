@@ -1,0 +1,342 @@
+.
+├── backend
+│   ├── app
+│   │   ├── auth.py
+│   │   ├── crud
+│   │   ├── crud.py
+│   │   ├── database.py
+│   │   ├── __init__.py
+│   │   ├── main.py
+│   │   ├── models.py
+│   │   ├── __pycache__
+│   │   ├── routers
+│   │   ├── schemas.py
+│   │   ├── test_db.py
+│   │   └── utils
+│   ├── create_tables.py
+│   ├── Dockerfile
+│   ├── __init__.py
+│   ├── requirements.txt
+│   ├── seed_data.py
+│   └── venv
+│       ├── bin
+│       ├── include
+│       ├── lib
+│       ├── lib64 -> lib
+│       └── pyvenv.cfg
+├── data
+│   ├── base
+│   │   ├── 1
+│   │   ├── 16384
+│   │   ├── 4
+│   │   └── 5
+│   ├── global
+│   │   ├── 1213
+│   │   ├── 1213_fsm
+│   │   ├── 1213_vm
+│   │   ├── 1214
+│   │   ├── 1232
+│   │   ├── 1233
+│   │   ├── 1260
+│   │   ├── 1260_fsm
+│   │   ├── 1260_vm
+│   │   ├── 1261
+│   │   ├── 1261_fsm
+│   │   ├── 1261_vm
+│   │   ├── 1262
+│   │   ├── 1262_fsm
+│   │   ├── 1262_vm
+│   │   ├── 2396
+│   │   ├── 2396_fsm
+│   │   ├── 2396_vm
+│   │   ├── 2397
+│   │   ├── 2671
+│   │   ├── 2672
+│   │   ├── 2676
+│   │   ├── 2677
+│   │   ├── 2694
+│   │   ├── 2695
+│   │   ├── 2697
+│   │   ├── 2698
+│   │   ├── 2846
+│   │   ├── 2847
+│   │   ├── 2964
+│   │   ├── 2965
+│   │   ├── 2966
+│   │   ├── 2967
+│   │   ├── 3592
+│   │   ├── 3593
+│   │   ├── 4060
+│   │   ├── 4061
+│   │   ├── 4175
+│   │   ├── 4176
+│   │   ├── 4177
+│   │   ├── 4178
+│   │   ├── 4181
+│   │   ├── 4182
+│   │   ├── 4183
+│   │   ├── 4184
+│   │   ├── 4185
+│   │   ├── 4186
+│   │   ├── 6000
+│   │   ├── 6001
+│   │   ├── 6002
+│   │   ├── 6100
+│   │   ├── 6114
+│   │   ├── 6115
+│   │   ├── 6243
+│   │   ├── 6244
+│   │   ├── 6245
+│   │   ├── 6246
+│   │   ├── 6247
+│   │   ├── 6302
+│   │   ├── 6303
+│   │   ├── pg_control
+│   │   ├── pg_filenode.map
+│   │   └── pg_internal.init
+│   ├── pg_commit_ts
+│   ├── pg_dynshmem
+│   ├── pg_hba.conf
+│   ├── pg_ident.conf
+│   ├── pg_logical
+│   │   ├── mappings
+│   │   ├── replorigin_checkpoint
+│   │   └── snapshots
+│   ├── pg_multixact
+│   │   ├── members
+│   │   └── offsets
+│   ├── pg_notify
+│   ├── pg_replslot
+│   ├── pg_serial
+│   ├── pg_snapshots
+│   ├── pg_stat
+│   ├── pg_stat_tmp
+│   ├── pg_subtrans
+│   │   └── 0000
+│   ├── pg_tblspc
+│   ├── pg_twophase
+│   ├── PG_VERSION
+│   ├── pg_wal
+│   │   ├── 000000010000000000000001
+│   │   ├── archive_status
+│   │   └── summaries
+│   ├── pg_xact
+│   │   └── 0000
+│   ├── postgresql.auto.conf
+│   ├── postgresql.conf
+│   ├── postmaster.opts
+│   └── postmaster.pid
+├── docker-compose.yml
+├── frontend
+│   ├── Dockerfile
+│   ├── frigo_buddy_simple.html
+│   ├── index.html
+│   ├── node_modules
+│   │   ├── @alloc
+│   │   ├── ansi-regex
+│   │   ├── ansi-styles
+│   │   ├── anymatch
+│   │   ├── any-promise
+│   │   ├── arg
+│   │   ├── asynckit
+│   │   ├── autoprefixer
+│   │   ├── axios
+│   │   ├── @babel
+│   │   ├── balanced-match
+│   │   ├── baseline-browser-mapping
+│   │   ├── binary-extensions
+│   │   ├── birpc
+│   │   ├── brace-expansion
+│   │   ├── braces
+│   │   ├── browserslist
+│   │   ├── call-bind-apply-helpers
+│   │   ├── camelcase-css
+│   │   ├── caniuse-lite
+│   │   ├── chokidar
+│   │   ├── color-convert
+│   │   ├── color-name
+│   │   ├── combined-stream
+│   │   ├── commander
+│   │   ├── copy-anything
+│   │   ├── cross-spawn
+│   │   ├── cssesc
+│   │   ├── csstype
+│   │   ├── date-fns
+│   │   ├── delayed-stream
+│   │   ├── didyoumean
+│   │   ├── dlv
+│   │   ├── dunder-proto
+│   │   ├── eastasianwidth
+│   │   ├── electron-to-chromium
+│   │   ├── emoji-regex
+│   │   ├── entities
+│   │   ├── @esbuild
+│   │   ├── esbuild
+│   │   ├── escalade
+│   │   ├── es-define-property
+│   │   ├── es-errors
+│   │   ├── es-object-atoms
+│   │   ├── es-set-tostringtag
+│   │   ├── estree-walker
+│   │   ├── fast-glob
+│   │   ├── fastq
+│   │   ├── fill-range
+│   │   ├── follow-redirects
+│   │   ├── foreground-child
+│   │   ├── form-data
+│   │   ├── fraction.js
+│   │   ├── function-bind
+│   │   ├── get-intrinsic
+│   │   ├── get-proto
+│   │   ├── glob
+│   │   ├── glob-parent
+│   │   ├── gopd
+│   │   ├── hasown
+│   │   ├── has-symbols
+│   │   ├── has-tostringtag
+│   │   ├── hookable
+│   │   ├── @isaacs
+│   │   ├── is-binary-path
+│   │   ├── is-core-module
+│   │   ├── isexe
+│   │   ├── is-extglob
+│   │   ├── is-fullwidth-code-point
+│   │   ├── is-glob
+│   │   ├── is-number
+│   │   ├── is-what
+│   │   ├── jackspeak
+│   │   ├── jiti
+│   │   ├── @jridgewell
+│   │   ├── lilconfig
+│   │   ├── lines-and-columns
+│   │   ├── lru-cache
+│   │   ├── magic-string
+│   │   ├── math-intrinsics
+│   │   ├── merge2
+│   │   ├── micromatch
+│   │   ├── mime-db
+│   │   ├── mime-types
+│   │   ├── minimatch
+│   │   ├── minipass
+│   │   ├── mitt
+│   │   ├── mz
+│   │   ├── nanoid
+│   │   ├── @nodelib
+│   │   ├── node-releases
+│   │   ├── normalize-path
+│   │   ├── normalize-range
+│   │   ├── object-assign
+│   │   ├── object-hash
+│   │   ├── package-json-from-dist
+│   │   ├── path-key
+│   │   ├── path-parse
+│   │   ├── path-scurry
+│   │   ├── perfect-debounce
+│   │   ├── picocolors
+│   │   ├── picomatch
+│   │   ├── pify
+│   │   ├── pinia
+│   │   ├── pirates
+│   │   ├── @pkgjs
+│   │   ├── postcss
+│   │   ├── postcss-import
+│   │   ├── postcss-js
+│   │   ├── postcss-load-config
+│   │   ├── postcss-nested
+│   │   ├── postcss-selector-parser
+│   │   ├── postcss-value-parser
+│   │   ├── proxy-from-env
+│   │   ├── queue-microtask
+│   │   ├── read-cache
+│   │   ├── readdirp
+│   │   ├── resolve
+│   │   ├── reusify
+│   │   ├── rfdc
+│   │   ├── @rollup
+│   │   ├── rollup
+│   │   ├── run-parallel
+│   │   ├── shebang-command
+│   │   ├── shebang-regex
+│   │   ├── signal-exit
+│   │   ├── source-map-js
+│   │   ├── speakingurl
+│   │   ├── string-width
+│   │   ├── string-width-cjs
+│   │   ├── strip-ansi
+│   │   ├── strip-ansi-cjs
+│   │   ├── sucrase
+│   │   ├── superjson
+│   │   ├── supports-preserve-symlinks-flag
+│   │   ├── tailwindcss
+│   │   ├── thenify
+│   │   ├── thenify-all
+│   │   ├── to-regex-range
+│   │   ├── ts-interface-checker
+│   │   ├── @types
+│   │   ├── update-browserslist-db
+│   │   ├── util-deprecate
+│   │   ├── vite
+│   │   ├── @vitejs
+│   │   ├── @vue
+│   │   ├── vue
+│   │   ├── vue-router
+│   │   ├── which
+│   │   ├── wrap-ansi
+│   │   └── wrap-ansi-cjs
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── postcss.config.js
+│   ├── src
+│   │   ├── App.vue
+│   │   ├── assets
+│   │   ├── composables
+│   │   ├── main.js
+│   │   ├── router
+│   │   ├── services
+│   │   ├── stores
+│   │   └── views
+│   ├── tailwind.config.js
+│   ├── testEnv.js
+│   └── vite.config.js
+├── models.py
+├── package-lock.json
+├── pgadmin_servers.json
+├── schemas.py
+├── scripts
+│   └── run-dev.ps1
+├── structure.txt
+├── test_connection.py
+└── venv
+    ├── bin
+    │   ├── activate
+    │   ├── activate.csh
+    │   ├── activate.fish
+    │   ├── Activate.ps1
+    │   ├── dotenv
+    │   ├── email_validator
+    │   ├── fastapi
+    │   ├── httpx
+    │   ├── pip
+    │   ├── pip3
+    │   ├── pip3.11
+    │   ├── pyrsa-decrypt
+    │   ├── pyrsa-encrypt
+    │   ├── pyrsa-keygen
+    │   ├── pyrsa-priv2pub
+    │   ├── pyrsa-sign
+    │   ├── pyrsa-verify
+    │   ├── python -> python3.11
+    │   ├── python3 -> python3.11
+    │   ├── python3.11 -> /usr/local/bin/python3.11
+    │   ├── uvicorn
+    │   ├── watchfiles
+    │   └── websockets
+    ├── include
+    │   ├── python3.11
+    │   └── site
+    ├── lib
+    │   └── python3.11
+    ├── lib64 -> lib
+    └── pyvenv.cfg
+
+209 directories, 131 files
