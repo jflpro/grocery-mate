@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   # ------------------------------------------------------------
-  # 1️⃣ SERVICE DE BASE DE DONNÉES (PostgreSQL)
+  # 1️⃣ BASE DE DONNÉES : PostgreSQL
   # ------------------------------------------------------------
   postgres:
     image: postgres:16
@@ -23,7 +23,7 @@ services:
     restart: unless-stopped
 
   # ------------------------------------------------------------
-  # 2️⃣ INTERFACE DE GESTION DE LA DB (pgAdmin)
+  # 2️⃣ INTERFACE DE GESTION (pgAdmin)
   # ------------------------------------------------------------
   pgadmin:
     image: dpage/pgadmin4:latest
@@ -31,7 +31,6 @@ services:
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@grocerymate.com
       PGADMIN_DEFAULT_PASSWORD: admin_password
-      # 🔹 Auto-connect to PostgreSQL
       PGADMIN_CONFIG_SERVER_MODE: "True"
     ports:
       - "8082:80"
@@ -40,13 +39,13 @@ services:
         condition: service_healthy
     volumes:
       - pgadmin_data:/var/lib/pgadmin
-      - ./pgadmin_servers.json:/pgadmin4/servers.json:ro   # fichier JSON pour auto-configuration
+      - ./pgadmin_servers.json:/pgadmin4/servers.json:ro
     networks:
       - devnet
     restart: unless-stopped
 
   # ------------------------------------------------------------
-  # 3️⃣ SERVICE DE L'APPLICATION BACKEND (FastAPI)
+  # 3️⃣ BACKEND : FastAPI + Gemini
   # ------------------------------------------------------------
   backend:
     build:
@@ -61,7 +60,7 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      DB_HOST: postgres
+      DB_HOST: grocery_postgres       # corrigé pour correspondre au nom du service
       DB_USER: grocery_user
       DB_PASSWORD: grocery_pass
       DB_NAME: grocery_db
@@ -73,7 +72,7 @@ services:
     restart: unless-stopped
 
   # ------------------------------------------------------------
-  # 4️⃣ SERVICE DU FRONTEND (Vite/Node.js)
+  # 4️⃣ FRONTEND : Vue.js / Vite
   # ------------------------------------------------------------
   frontend:
     build:
@@ -91,7 +90,7 @@ services:
     restart: unless-stopped
 
   # ------------------------------------------------------------
-  # 5️⃣ NGINX PROXY MANAGER (Pour gérer les DNS et HTTPS)
+  # 5️⃣ NGINX PROXY MANAGER
   # ------------------------------------------------------------
   nginx-proxy-manager:
     image: jc21/nginx-proxy-manager:latest
@@ -108,14 +107,14 @@ services:
       - devnet
 
 # ------------------------------------------------------------
-# RÉSEAU COMMUN
+# 🔹 RÉSEAU COMMUN
 # ------------------------------------------------------------
 networks:
   devnet:
     driver: bridge
 
 # ------------------------------------------------------------
-# VOLUMES POUR PERSISTANCE
+# 🔹 VOLUMES PERSISTANTS
 # ------------------------------------------------------------
 volumes:
   postgres_data:
