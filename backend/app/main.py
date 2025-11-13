@@ -9,49 +9,63 @@ from app.routers import (
     seed,
     auth,
     newsletter,
-    ai,  # ✅ Route AI
+    ai,
 )
 
-# --- Création des tables manquantes ---
+# --- Création des tables ---
 create_db_tables_if_not_exists()
 
-# --- Initialisation de l'application ---
+# --- App FastAPI ---
 app = FastAPI(
     title="GroceryMate API",
     description="API for managing groceries, shopping lists, recipes, and AI-powered features",
     version="1.1.0",
 )
 
-# --- Middleware CORS ---
+# ---------------------------------------------------------
+# 🔐 CORS — VERSION SÉCURISÉE (PROD + DEV)
+# ---------------------------------------------------------
+
 origins = [
-    "http://localhost:5173",              # Frontend local
-    "http://127.0.0.1:5173",              # Variante loopback
-    "http://grocery_frontend:5173",       # Service Docker frontend
-    "http://grocery_backend:8000",        # Communication inter-conteneurs
-    "http://host.docker.internal:5173",   # Docker Desktop Windows/macOS
+    # Développement local
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+
+    # Production
+    "http://91.99.21.21",
+    "http://91.99.21.21:5173",  # ton front en prod
+    "http://91.99.21.21:80",    # via Nginx Proxy Manager
+    "http://91.99.21.21:443",   # HTTPS NPM
+
+    # Réseau Docker interne (optionnel mais propre)
+    "http://grocery_frontend",
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=origins,        # aucune wildcard
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# --- Inclusion des routes principales ---
+# ---------------------------------------------------------
+# Routes API
+# ---------------------------------------------------------
+
 app.include_router(ingredients.router, prefix="/api")
 app.include_router(recipes.router, prefix="/api")
 app.include_router(shopping_lists.router, prefix="/api")
 app.include_router(seed.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
 app.include_router(newsletter.router, prefix="/api")
-app.include_router(ai.router, prefix="/api/ai")  # ✅ Route AI
+app.include_router(ai.router, prefix="/api/ai")
 
-# --- Route racine ---
+# ---------------------------------------------------------
+# Racine API
+# ---------------------------------------------------------
 @app.get("/")
 def read_root():
-    """Point d’entrée de l’API GroceryMate."""
     return {
         "message": "Welcome to GroceryMate API",
         "docs": "/docs",
@@ -63,7 +77,9 @@ def read_root():
         "seed_endpoint": "/api/seed/",
     }
 
-# --- Vérification de santé ---
+# ---------------------------------------------------------
+# Health check
+# ---------------------------------------------------------
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}

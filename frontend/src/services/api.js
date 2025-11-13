@@ -1,7 +1,11 @@
 import axios from "axios";
 
 // 🌐 URL de base du backend
-const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000/api";
+// Utilise la variable d'environnement définie dans frontend/.env
+// et garantit une cohérence entre Docker, dev local et production.
+const API_BASE = import.meta.env.VITE_BACKEND_URL
+  ? `${import.meta.env.VITE_BACKEND_URL}/api`
+  : "http://localhost:8000/api";
 
 // --- Instance Axios principale ---
 const api = axios.create({
@@ -11,13 +15,11 @@ const api = axios.create({
   },
 });
 
-// --- Intercepteur pour ajouter le token à chaque requête ---
+// --- Intercepteur pour ajouter automatiquement le token JWT ---
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("access_token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+    if (token) config.headers.Authorization = `Bearer ${token}`;
     return config;
   },
   (error) => Promise.reject(error)
@@ -25,7 +27,17 @@ api.interceptors.request.use(
 
 export default api;
 
-// --- Shopping Lists API ---
+// ---------------------------------------------------------------------------
+// 🤖 API IA (Gemini)
+// ---------------------------------------------------------------------------
+export const aiAPI = {
+  ask: (question) => api.get(`/ai/ask`, { params: { question } }),
+  recipe: (ingredients) => api.get(`/ai/recipe`, { params: { ingredients } }),
+};
+
+// ---------------------------------------------------------------------------
+// 🧺 Shopping Lists API
+// ---------------------------------------------------------------------------
 export const shoppingListsAPI = {
   getAll: () => api.get(`/shopping-lists`),
   add: (data) => api.post(`/shopping-lists`, data),
@@ -36,7 +48,9 @@ export const shoppingListsAPI = {
   deleteItem: (itemId) => api.delete(`/shopping-lists/items/${itemId}`),
 };
 
-// --- Ingredients API ---
+// ---------------------------------------------------------------------------
+// 🥕 Ingredients API
+// ---------------------------------------------------------------------------
 export const ingredientsAPI = {
   getAll: () => api.get(`/ingredients`),
   add: (data) => api.post(`/ingredients`, data),
@@ -46,7 +60,9 @@ export const ingredientsAPI = {
   seedSample: () => api.post(`/ingredients/seed-sample`),
 };
 
-// --- Recipes API ---
+// ---------------------------------------------------------------------------
+// 🍽 Recipes API
+// ---------------------------------------------------------------------------
 export const recipesAPI = {
   getAll: () => api.get(`/recipes`),
   add: (data) => api.post(`/recipes`, data),
@@ -56,25 +72,26 @@ export const recipesAPI = {
   seedSample: () => api.post(`/recipes/seed-sample`),
 };
 
-// --- Auth API ---
+// ---------------------------------------------------------------------------
+// 🔐 Auth API
+// ---------------------------------------------------------------------------
 export const authAPI = {
   register: (data) => api.post(`/auth/register`, data),
-
   login: (email, password) => {
     const formData = new URLSearchParams();
     formData.append("username", email);
     formData.append("password", password);
-
     return api.post(`/auth/token`, formData, {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
     });
   },
-
   me: () => api.get(`/auth/me`),
   logout: () => api.post(`/auth/logout`),
 };
 
-// --- Seed global (données de test) ---
+// ---------------------------------------------------------------------------
+// 🌱 Seed API (initialisation de données de test)
+// ---------------------------------------------------------------------------
 export const seedAPI = {
   seedAll: () => api.post(`/seed`),
 };

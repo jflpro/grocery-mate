@@ -23,7 +23,7 @@ services:
     restart: unless-stopped
 
   # ------------------------------------------------------------
-  # 2️⃣ INTERFACE DE GESTION (pgAdmin)
+  # 2️⃣ INTERFACE DE GESTION PGADMIN
   # ------------------------------------------------------------
   pgadmin:
     image: dpage/pgadmin4:latest
@@ -45,7 +45,7 @@ services:
     restart: unless-stopped
 
   # ------------------------------------------------------------
-  # 3️⃣ BACKEND : FastAPI + Gemini
+  # 3️⃣ BACKEND FASTAPI
   # ------------------------------------------------------------
   backend:
     build:
@@ -60,7 +60,7 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      DB_HOST: grocery_postgres       # corrigé pour correspondre au nom du service
+      DB_HOST: grocery_postgres
       DB_USER: grocery_user
       DB_PASSWORD: grocery_pass
       DB_NAME: grocery_db
@@ -72,19 +72,22 @@ services:
     restart: unless-stopped
 
   # ------------------------------------------------------------
-  # 4️⃣ FRONTEND : Vue.js / Vite
+  # 4️⃣ FRONTEND - BUILD VITE SERVI PAR NGINX (PRODUCTION)
   # ------------------------------------------------------------
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: grocery_frontend
-    command: npm run dev -- --host 0.0.0.0
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+
+    # ❌ IMPORTANT : aucun npm dans l’image finale → pas de commande custom
+    # → On utilise le CMD du Dockerfile (nginx)
     ports:
-      - "5173:5173"
+      - "5173:80"
+
+    env_file:
+      - ./frontend/.env.production
+
     networks:
       - devnet
     restart: unless-stopped
@@ -97,9 +100,9 @@ services:
     container_name: nginx_proxy_manager
     restart: unless-stopped
     ports:
-      - "8081:80"
-      - "8181:81"
-      - "4443:443"
+      - "80:80"
+      - "81:81"
+      - "443:443"
     volumes:
       - /srv/dockerdata/nginx/data:/data
       - /srv/dockerdata/nginx/letsencrypt:/etc/letsencrypt
@@ -107,15 +110,12 @@ services:
       - devnet
 
 # ------------------------------------------------------------
-# 🔹 RÉSEAU COMMUN
+# Réseau et volumes
 # ------------------------------------------------------------
 networks:
   devnet:
     driver: bridge
 
-# ------------------------------------------------------------
-# 🔹 VOLUMES PERSISTANTS
-# ------------------------------------------------------------
 volumes:
   postgres_data:
   pgadmin_data:

@@ -1,24 +1,29 @@
 # ------------------------------------------------------------
 # 📁 backend/Dockerfile
-# 🎯 Dockerfile pour FastAPI + Uvicorn
+# 🎯 Dockerfile pour FastAPI + Uvicorn en production
 # ------------------------------------------------------------
 
-# Utilise une image Python légère et stable
 FROM python:3.11-slim
 
-# Variables d'environnement Python
+# Empêche Python de générer des fichiers .pyc
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Répertoire de travail dans le conteneur
+# Répertoire de travail
 WORKDIR /app
 
-# Copie le fichier requirements et installe les dépendances
+# Installation de dépendances système nécessaires pour argon2-cffi
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libffi-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copie et installation des dépendances Python
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copie tout le reste du code
+# Copie du code backend
 COPY . .
 
-# Commande de démarrage FastAPI avec Uvicorn
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Démarre FastAPI/Uvicorn
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

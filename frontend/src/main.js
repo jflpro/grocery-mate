@@ -1,27 +1,36 @@
-import { createApp } from 'vue';
-// 1. Import du package Pinia
-import { createPinia } from 'pinia'; 
-import App from './App.vue';
-import router from './router'; 
-import './assets/main.css';
-// 2. Import du store d'authentification
-import { useAuthStore } from './stores/auth'; 
+import { createApp } from 'vue'
+import { createPinia } from 'pinia'
+import App from './App.vue'
+import router from './router'
+import './assets/main.css'
+import { useAuthStore } from './stores/auth'
 
-// Création de l'application Vue
-const app = createApp(App);
+// --- Création de l’application Vue ---
+const app = createApp(App)
 
-// 3. Création de l'instance Pinia
-const pinia = createPinia();
-app.use(pinia);
-app.use(router);
+// --- Configuration de Pinia et du Router ---
+const pinia = createPinia()
+app.use(pinia)
+app.use(router)
 
-// --- TEST .env ---
-console.log("VITE_BACKEND_URL:", import.meta.env.VITE_BACKEND_URL); 
-// Si undefined -> ton fichier .env n'est pas détecté
+// --- Vérification de la configuration d’environnement ---
+console.group("🌍 Configuration environnement frontend")
+console.log("VITE_BACKEND_URL =", import.meta.env.VITE_BACKEND_URL)
+if (!import.meta.env.VITE_BACKEND_URL) {
+  console.warn("⚠️ Attention : la variable VITE_BACKEND_URL est absente ou non chargée.")
+  console.warn("Vérifie ton fichier frontend/.env et le docker-compose du service frontend.")
+}
+console.groupEnd()
 
-// --- Initialisation de l'authentification ---
-const authStore = useAuthStore();
-authStore.initializeAuth(); 
+// --- Initialisation de l’authentification ---
+const authStore = useAuthStore()
+try {
+  await authStore.initializeAuth()
+  console.log("✅ Authentification initialisée avec succès")
+} catch (error) {
+  console.error("❌ Erreur d’initialisation du store d’authentification :", error)
+}
 
-// Montage de l'application
-app.mount('#app');
+// --- Montage final ---
+app.mount('#app')
+console.log("🚀 Application Vue montée avec succès")
