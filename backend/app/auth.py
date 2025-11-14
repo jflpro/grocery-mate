@@ -10,7 +10,7 @@ from app.utils import security
 
 # --- OAuth2 Scheme ---
 # Note : le chemin doit correspondre exactement à votre route token
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
 
 
 # --- CRUD Utilisateur ---

@@ -83,10 +83,7 @@ services:
     # ❌ IMPORTANT : aucun npm dans l’image finale → pas de commande custom
     # → On utilise le CMD du Dockerfile (nginx)
     ports:
-      - "5173:80"
-
-    env_file:
-      - ./frontend/.env.production
+      - "5173:80"  
 
     networks:
       - devnet
