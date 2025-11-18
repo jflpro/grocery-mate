@@ -1,0 +1,18 @@
+version: "3"
+services:
+  nginx-proxy-manager:
+    image: jc21/nginx-proxy-manager:latest
+    ports:
+      - "8080:80"   # HTTP personnalisé
+      - "8443:443"  # HTTPS personnalisé
+      - "8081:81"   # Port d'admin personnalisé
+    volumes:
+      - "/srv/dockerdata/nginx/letsencrypt:/etc/letsencrypt"
+      - "/srv/dockerdata/nginx/data:/data"
+    networks:
+      - grocery-mate_devnet
+    restart: unless-stopped
+
+networks:
+  grocery-mate_devnet:
+    external: true  # Si le réseau est déjà créé, sinon supprimer cette ligne.
