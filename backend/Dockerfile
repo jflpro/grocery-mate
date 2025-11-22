@@ -1,29 +1,48 @@
 # ------------------------------------------------------------
-# 📁 backend/Dockerfile
-# 🎯 Dockerfile pour FastAPI + Uvicorn en production
+# 🐍 Stage 1 : Build des dépendances
 # ------------------------------------------------------------
+FROM python:3.11-slim AS builder
 
-FROM python:3.11-slim
+WORKDIR /app
 
-# Empêche Python de générer des fichiers .pyc
+# Optimisation Python
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Répertoire de travail
-WORKDIR /app
-
-# Installation de dépendances système nécessaires pour argon2-cffi
-RUN apt-get update && apt-get install -y \
+# Dépendances système nécessaires (argon2 + psycopg2)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libffi-dev \
+    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copie et installation des dépendances Python
+# Copie du requirements
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
 
-# Copie du code backend
-COPY . .
+# Construction d’un venv PRODUCTION
+RUN python -m venv /venv && \
+    /venv/bin/pip install --no-cache-dir -r requirements.txt
 
-# Démarre FastAPI/Uvicorn
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# ------------------------------------------------------------
+# 🚀 Stage 2 : Image finale ultra légère
+# ------------------------------------------------------------
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Optimisation Python
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Copie du venv buildé
+COPY --from=builder /venv /venv
+
+# Active le venv dans PATH
+ENV PATH="/venv/bin:$PATH"
+
+# Copier uniquement le code utile
+COPY app ./app
+
+# Serveur Gunicorn + UvicornWorker (PROD)
+CMD ["gunicorn", "app.main:app", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--workers", "4"]

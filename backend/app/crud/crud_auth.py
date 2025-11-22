@@ -1,144 +1,319 @@
-# ------------------------------------------------------------
-# 📁 Fichier : app/utils/security.py
-# 🎯 Objectif : Fonctions de sécurité, hachage, JWT et dépendances d'authentification
-# ------------------------------------------------------------
+# app/crud/crud_auth.py
+from typing import List, Optional
 
-from datetime import datetime, timedelta, timezone
-from typing import Optional
-
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from jose import jwt, JWTError
 from sqlalchemy.orm import Session
-from passlib.context import CryptContext
+from sqlalchemy import select, delete, func, and_
 
-# Importations absolues pour la robustesse (comme vous l'avez corrigé)
-from app.database import get_db
-from app import models, schemas # Assurez-vous d'importer schemas
+from app import models, schemas
+from app.utils.security import get_password_hash
 
-# --- Configuration de Sécurité ---
-SECRET_KEY = "super-secret-key-that-should-be-in-env-vars"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # Token expire dans 7 jours
-
-# CHANGEMENT CRITIQUE ICI : Passage de 'bcrypt' à 'pbkdf2_sha256' 
-# pour contourner l'AttributeError/ValueError sur votre système Windows.
-pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
-
-# Schéma OAuth2 pour extraire le token du header
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
-
-# ==========================================================
-# 1. FONCTIONS DE HACHAGE ET VÉRIFICATION
-# ==========================================================
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Vérifie si le mot de passe clair correspond au mot de passe haché."""
-    return pwd_context.verify(plain_password, hashed_password)
-
-def get_password_hash(password: str) -> str:
-    """Hache un mot de passe."""
-    return pwd_context.hash(password)
-
-# ==========================================================
-# 2. FONCTIONS CRUD DE BASE
-# ==========================================================
+# ====================================================================
+# UTILISATEURS
+# ====================================================================
 
 def get_user_by_email(db: Session, email: str) -> Optional[models.User]:
-    """Récupère un utilisateur par son email."""
-    return db.query(models.User).filter(models.User.email == email).first()
+    """Récupère un utilisateur par son adresse e-mail."""
+    return db.scalars(
+        select(models.User).filter(models.User.email == email)
+    ).first()
+
+
+def get_user_by_username(db: Session, username: str) -> Optional[models.User]:
+    """Récupère un utilisateur par son nom d'utilisateur."""
+    return db.scalars(
+        select(models.User).filter(models.User.username == username)
+    ).first()
+
 
 def create_user(db: Session, user: schemas.UserCreate) -> models.User:
-    """Crée un nouvel utilisateur dans la base de données."""
-    # Le mot de passe haché doit déjà être défini dans le routeur avant d'appeler cette fonction
-    # Le préfixe '$2b$' (bcrypt) ne s'applique plus; on s'assure juste du hachage.
-    
-    # ⚠️ NOTE IMPORTANTE: Normalement, le hachage doit être fait UNE seule fois dans le routeur 
-    # pour éviter de hacher plusieurs fois. Ici, on s'assure que le hachage est fait
-    # au cas où la fonction serait appelée directement avec un mot de passe non haché.
-    if user.password and not user.password.startswith("$pbkdf2-sha256$"):
-        hashed_password = get_password_hash(user.password)
-    else:
-        # Si le mot de passe semble déjà haché (ou est None)
-        hashed_password = user.password
-
+    """Crée un nouvel utilisateur en hachant le mot de passe."""
+    hashed_password = get_password_hash(user.password)
     db_user = models.User(
         email=user.email,
         username=user.username,
-        password=hashed_password # Le champ dans le modèle est 'password', qui stocke le hachage
+        password=hashed_password,
     )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
     return db_user
 
-def authenticate_user(db: Session, email: str, password: str) -> Optional[models.User]:
-    """Tente d'authentifier un utilisateur par email et mot de passe."""
-    user = get_user_by_email(db, email=email)
-    if not user or not verify_password(password, user.password):
-        return None
-    return user
+# ====================================================================
+# INGRÉDIENTS (INVENTAIRE)
+# ====================================================================
 
-# ==========================================================
-# 3. FONCTIONS DE TOKEN JWT
-# ==========================================================
-
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """Crée un jeton d'accès JWT."""
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-# ==========================================================
-# 4. FONCTIONS DE DÉPENDANCE (AJUSTÉES)
-# ==========================================================
-
-def get_current_user_id(token: str = Depends(oauth2_scheme)) -> int:
-    """Décode le token et retourne l'ID utilisateur, lève une erreur si le token est invalide."""
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
+def create_user_ingredient(
+    db: Session, ingredient: schemas.IngredientCreate, user_id: int
+) -> models.Ingredient:
+    """Ajoute un ingrédient à l'inventaire d'un utilisateur."""
+    db_ingredient = models.Ingredient(
+        **ingredient.model_dump(), owner_id=user_id
     )
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: int = payload.get("user_id")
-        if user_id is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
-    
-    return user_id
+    db.add(db_ingredient)
+    db.commit()
+    db.refresh(db_ingredient)
+    return db_ingredient
 
-# Renommée à la convention 'get_current_active_user' pour le routeur /me
-def get_current_active_user(db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)) -> models.User:
-    """Récupère l'objet User à partir du token (authentification obligatoire)."""
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
 
-def get_current_user_optional(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)) -> Optional[models.User]:
+def get_user_ingredients(
+    db: Session, user_id: int, skip: int = 0, limit: int = 100
+) -> List[models.Ingredient]:
+    """Récupère tous les ingrédients d'un utilisateur."""
+    return db.scalars(
+        select(models.Ingredient)
+        .filter(models.Ingredient.owner_id == user_id)
+        .offset(skip)
+        .limit(limit)
+    ).all()
+
+
+def get_user_ingredient(
+    db: Session, ingredient_id: int, user_id: int
+) -> Optional[models.Ingredient]:
+    """Récupère un ingrédient spécifique d'un utilisateur."""
+    return db.scalars(
+        select(models.Ingredient).filter(
+            models.Ingredient.id == ingredient_id,
+            models.Ingredient.owner_id == user_id,
+        )
+    ).first()
+
+
+def update_user_ingredient(
+    db: Session, db_ingredient: models.Ingredient, ingredient: schemas.IngredientUpdate
+) -> models.Ingredient:
+    """Met à jour un ingrédient existant."""
+    update_data = ingredient.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_ingredient, key, value)
+
+    db_ingredient.updated_at = func.now()
+    db.commit()
+    db.refresh(db_ingredient)
+    return db_ingredient
+
+
+def delete_user_ingredient(db: Session, db_ingredient: models.Ingredient) -> None:
+    """Supprime un ingrédient de l'inventaire."""
+    db.delete(db_ingredient)
+    db.commit()
+
+# ====================================================================
+# RECETTES
+# ====================================================================
+
+def create_user_recipe(
+    db: Session, recipe: schemas.RecipeCreate, user_id: int
+) -> models.Recipe:
+    """Crée une nouvelle recette (et ses ingrédients requis) pour un utilisateur."""
+    # 1. Recette de base
+    recipe_data = recipe.model_dump(exclude={"required_ingredients"})
+    db_recipe = models.Recipe(**recipe_data, owner_id=user_id)
+    db.add(db_recipe)
+    db.flush()  # pour avoir db_recipe.id
+
+    # 2. Ingrédients requis
+    for req_ing in recipe.required_ingredients:
+        db_req_ing = models.RecipeIngredient(
+            **req_ing.model_dump(), recipe_id=db_recipe.id
+        )
+        db.add(db_req_ing)
+
+    db.commit()
+    db.refresh(db_recipe)
+    return db_recipe
+
+
+def get_recipe_by_id(db: Session, recipe_id: int) -> Optional[models.Recipe]:
+    """Récupère une recette par son ID."""
+    return db.scalars(
+        select(models.Recipe).filter(models.Recipe.id == recipe_id)
+    ).first()
+
+
+def get_public_and_owner_recipes(
+    db: Session, user_id: int, skip: int = 0, limit: int = 100
+) -> List[models.Recipe]:
+    """Récupère les recettes publiques ET celles de l'utilisateur."""
+    return db.scalars(
+        select(models.Recipe)
+        .filter(
+            (models.Recipe.is_public == True)  # noqa: E712
+            | (models.Recipe.owner_id == user_id)
+        )
+        .order_by(models.Recipe.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    ).all()
+
+
+def update_recipe(
+    db: Session, db_recipe: models.Recipe, recipe: schemas.RecipeUpdate
+) -> models.Recipe:
+    """Met à jour une recette existante."""
+    update_data = recipe.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_recipe, key, value)
+
+    db.commit()
+    db.refresh(db_recipe)
+    return db_recipe
+
+
+def delete_recipe(db: Session, db_recipe: models.Recipe) -> None:
+    """Supprime une recette."""
+    db.delete(db_recipe)
+    db.commit()
+
+# ====================================================================
+# LISTES DE COURSES
+# ====================================================================
+
+def create_shopping_list(
+    db: Session, list_data: schemas.ShoppingListCreate, user_id: int
+) -> models.ShoppingList:
+    """Crée une nouvelle liste de courses."""
+    db_list = models.ShoppingList(**list_data.model_dump(), owner_id=user_id)
+    db.add(db_list)
+    db.commit()
+    db.refresh(db_list)
+    return db_list
+
+
+def get_user_shopping_lists(
+    db: Session, user_id: int, skip: int = 0, limit: int = 100
+) -> List[models.ShoppingList]:
+    """Récupère toutes les listes de courses d'un utilisateur."""
+    return db.scalars(
+        select(models.ShoppingList)
+        .filter(models.ShoppingList.owner_id == user_id)
+        .offset(skip)
+        .limit(limit)
+    ).all()
+
+
+def get_shopping_list_by_id(
+    db: Session, list_id: int, user_id: int
+) -> Optional[models.ShoppingList]:
+    """Récupère une liste de courses spécifique."""
+    return db.scalars(
+        select(models.ShoppingList).filter(
+            models.ShoppingList.id == list_id,
+            models.ShoppingList.owner_id == user_id,
+        )
+    ).first()
+
+
+def delete_shopping_list(db: Session, db_list: models.ShoppingList) -> None:
+    """Supprime une liste de courses (items en cascade)."""
+    db.delete(db_list)
+    db.commit()
+
+# ====================================================================
+# ITEMS DE LISTES DE COURSES
+# ====================================================================
+
+def create_shopping_item(
+    db: Session, item: schemas.ShoppingItemCreate, list_id: int
+) -> models.ShoppingItem:
+    """Ajoute un item à une liste de courses."""
+    db_item = models.ShoppingItem(
+        **item.model_dump(), shopping_list_id=list_id
+    )
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+
+def get_shopping_item_by_id(
+    db: Session, item_id: int
+) -> Optional[models.ShoppingItem]:
+    """Récupère un item de liste de courses par son ID."""
+    return db.scalars(
+        select(models.ShoppingItem).filter(
+            models.ShoppingItem.id == item_id
+        )
+    ).first()
+
+
+def update_shopping_item(
+    db: Session, db_item: models.ShoppingItem, update_data: schemas.ShoppingItemUpdate
+) -> models.ShoppingItem:
+    """Met à jour un item de liste de courses."""
+    for key, value in update_data.model_dump(exclude_unset=True).items():
+        setattr(db_item, key, value)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+
+def delete_shopping_item(db: Session, db_item: models.ShoppingItem) -> None:
+    """Supprime un item d'une liste de courses."""
+    db.delete(db_item)
+    db.commit()
+
+# ====================================================================
+# VÉRIFICATION D'INVENTAIRE POUR UNE RECETTE
+# ====================================================================
+
+def check_inventory_for_recipe(
+    db: Session, recipe_id: int, user_id: int
+) -> schemas.InventoryCheckResponse:
     """
-    Récupère l'objet User à partir du token.
-    Si le token est manquant ou invalide, retourne None (authentification optionnelle).
+    Compare l'inventaire de l'utilisateur avec les ingrédients requis
+    par une recette et retourne les manquants / disponibles.
     """
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: int = payload.get("user_id")
-        
-        if user_id is None:
-            return None 
-            
-        user = db.query(models.User).filter(models.User.id == user_id).first()
-        return user
-        
-    except (JWTError, AttributeError, HTTPException):
-        # On attrape JWTError, AttributeError et HTTPException (levée par Depends(oauth2_scheme)
-        # si aucun token n'est fourni) et on retourne None pour l'optionnel.
-        return None
+
+    required_ingredients = db.scalars(
+        select(models.RecipeIngredient).filter(
+            models.RecipeIngredient.recipe_id == recipe_id
+        )
+    ).all()
+
+    user_inventory = db.scalars(
+        select(models.Ingredient).filter(
+            models.Ingredient.owner_id == user_id
+        )
+    ).all()
+
+    inventory_map: dict[tuple[str, str], float] = {}
+    for item in user_inventory:
+        key = (item.name.lower(), item.unit.lower())
+        inventory_map[key] = inventory_map.get(key, 0.0) + item.quantity
+
+    missing_items = []
+    available_items = []
+    can_make = True
+
+    for required in required_ingredients:
+        req_key = (required.name.lower(), required.unit.lower())
+        available_quantity = inventory_map.get(req_key, 0.0)
+        required_quantity = required.quantity
+
+        if available_quantity < required_quantity:
+            can_make = False
+            missing_items.append(
+                {
+                    "name": required.name,
+                    "required": required_quantity,
+                    "available": available_quantity,
+                    "unit": required.unit,
+                }
+            )
+        else:
+            available_items.append(
+                {
+                    "name": required.name,
+                    "needed": required_quantity,
+                    "available": available_quantity,
+                    "unit": required.unit,
+                }
+            )
+
+    return schemas.InventoryCheckResponse(
+        recipe_id=recipe_id,
+        can_make=can_make,
+        missing_items=missing_items,
+        available_items=available_items,
+    )

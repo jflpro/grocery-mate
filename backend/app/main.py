@@ -1,85 +1,89 @@
+# 📁 app/main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database import create_db_tables_if_not_exists
-from app.routers import (
+from .database import create_db_tables_if_not_exists
+from .routers import (
+    auth,
     ingredients,
     recipes,
     shopping_lists,
     seed,
-    auth,
     newsletter,
     ai,
 )
 
-# --- Création des tables ---
-create_db_tables_if_not_exists()
-
-# --- App FastAPI ---
+# --------------------------------------------------------------------
+# Application FastAPI
+# --------------------------------------------------------------------
 app = FastAPI(
     title="GroceryMate API",
-    description="API for managing groceries, shopping lists, recipes, and AI-powered features",
-    version="1.1.0",
+    version="1.0.0",
+    description="Backend API pour l'application GroceryMate",
 )
 
-# ---------------------------------------------------------
-# 🔐 CORS — VERSION SÉCURISÉE (PROD + DEV)
-# ---------------------------------------------------------
-
+# --------------------------------------------------------------------
+# Configuration CORS
+# --------------------------------------------------------------------
 origins = [
-    # Développement local
+    # Dev local
+    "http://localhost",
     "http://localhost:5173",
-    "http://127.0.0.1:5173",
+    "http://127.0.0.1",
 
-    # Production
-    "http://91.99.21.21",
-    "http://91.99.21.21:5173",  # ton front en prod
-    "http://91.99.21.21:80",    # via Nginx Proxy Manager
-    "http://91.99.21.21:443",   # HTTPS NPM
-
-    # Réseau Docker interne (optionnel mais propre)
-    "http://grocery_frontend",
+    # Prod
+    "https://gro-mate.tech",
+    "https://www.gro-mate.tech",
+    "https://api.gro-mate.tech",
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,        # aucune wildcard
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ---------------------------------------------------------
-# Routes API
-# ---------------------------------------------------------
+# --------------------------------------------------------------------
+# Hooks de démarrage
+# --------------------------------------------------------------------
+@app.on_event("startup")
+def on_startup() -> None:
+    """Création des tables si elles n'existent pas."""
+    create_db_tables_if_not_exists()
 
-app.include_router(ingredients.router, prefix="/api")
-app.include_router(recipes.router, prefix="/api")
-app.include_router(shopping_lists.router, prefix="/api")
-app.include_router(seed.router, prefix="/api")
+
+# --------------------------------------------------------------------
+# Endpoint de santé
+# --------------------------------------------------------------------
+@app.get("/health", tags=["health"])
+def health_check() -> dict:
+    return {"status": "ok"}
+
+
+# --------------------------------------------------------------------
+# Routers API
+# --------------------------------------------------------------------
+# Authentification / JWT / utilisateurs
 app.include_router(auth.router, prefix="/api")
+
+# Ingrédients
+app.include_router(ingredients.router, prefix="/api")
+
+# Recettes
+app.include_router(recipes.router, prefix="/api")
+
+# Listes de courses
+app.include_router(shopping_lists.router, prefix="/api")
+
+# Seed global (données de démo)
+# => /api/seed/
+app.include_router(seed.router, prefix="/api")
+
+# Newsletter
 app.include_router(newsletter.router, prefix="/api")
+
+# IA (endpoints spécifiques IA)
+# => /api/ai/...
 app.include_router(ai.router, prefix="/api/ai")
-
-# ---------------------------------------------------------
-# Racine API
-# ---------------------------------------------------------
-@app.get("/")
-def read_root():
-    return {
-        "message": "Welcome to GroceryMate API",
-        "docs": "/docs",
-        "redoc": "/redoc",
-        "ai_routes": {
-            "ask": "/api/ai/ask",
-            "recipe": "/api/ai/recipe",
-        },
-        "seed_endpoint": "/api/seed/",
-    }
-
-# ---------------------------------------------------------
-# Health check
-# ---------------------------------------------------------
-@app.get("/health")
-def health_check():
-    return {"status": "healthy"}

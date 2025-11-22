@@ -1,11 +1,10 @@
 <script setup>
 import { ref, onMounted } from "vue";
-import { ingredientsAPI } from "@/services/api.js";
-import { format } from "date-fns";
-import { fr } from "date-fns/locale";
+import { ingredientsAPI } from "@/services/api";
 
-const UNITS = ["g", "kg", "ml", "L", "unité", "paquet"];
-
+/* ---------------------------
+   STATE
+--------------------------- */
 const ingredients = ref([]);
 const isLoading = ref(false);
 
@@ -13,230 +12,507 @@ const showCreateModal = ref(false);
 const showEditModal = ref(false);
 const showConfirmDeleteModal = ref(false);
 
+const categories = [
+  "Vegetables",
+  "Fruits",
+  "Meat",
+  "Fish",
+  "Dairy",
+  "Grains",
+  "Snacks",
+  "Drinks",
+  "Other",
+];
+
+const locations = ["Fridge", "Freezer", "Pantry", "Other"];
+
+const units = ["pcs", "kg", "g", "L", "ml", "pack"];
+
 const newIngredient = ref({
   name: "",
+  category: "Vegetables",
+  location: "Fridge",
   quantity: 1,
-  unit: "unité",
-  expiration_date: null,
+  unit: "pcs",
+  expiry_date: null, // string "YYYY-MM-DD" ou null
 });
+
 const editingIngredient = ref(null);
 const deletingIngredientId = ref(null);
 
-const formatDate = (dateString) => {
-  if (!dateString) return "Non spécifiée";
-  try {
-    return format(new Date(dateString), "dd MMMM yyyy", { locale: fr });
-  } catch (e) {
-    return dateString;
+/* ---------------------------
+   HELPERS
+--------------------------- */
+const normalizePayload = (ing) => {
+  const payload = {
+    name: ing.name?.trim(),
+    category: ing.category || null,
+    location: ing.location || null,
+    quantity: Number(ing.quantity) || 0,
+    unit: ing.unit || "pcs",
+  };
+
+  if (ing.expiry_date && ing.expiry_date !== "") {
+    payload.expiry_date = ing.expiry_date; // HTML date input → "YYYY-MM-DD"
   }
+
+  console.log("🔧 Normalized ingredient payload:", payload);
+  return payload;
 };
 
+const resetNewIngredient = () => ({
+  name: "",
+  category: "Vegetables",
+  location: "Fridge",
+  quantity: 1,
+  unit: "pcs",
+  expiry_date: null,
+});
+
+/* ---------------------------
+   LOADERS
+--------------------------- */
 const loadIngredients = async () => {
   isLoading.value = true;
   try {
+    console.log("📥 Loading ingredients...");
     const res = await ingredientsAPI.getAll();
-    ingredients.value = res.data.sort((a, b) => {
-      if (a.expiration_date && b.expiration_date)
-        return new Date(a.expiration_date) - new Date(b.expiration_date);
-      if (a.expiration_date) return -1;
-      if (b.expiration_date) return 1;
-      return 0;
-    });
+    console.log("📥 Ingredients loaded from API:", res.data);
+    ingredients.value = res.data;
   } catch (error) {
-    console.error("Erreur chargement ingrédients:", error);
+    console.error("❌ Error while loading ingredients:", error);
   } finally {
     isLoading.value = false;
   }
 };
 
+/* ---------------------------
+   CREATE
+--------------------------- */
 const createIngredient = async () => {
-  if (!newIngredient.value.name.trim() || newIngredient.value.quantity <= 0) return;
+  if (!newIngredient.value.name.trim()) {
+    console.warn("⚠️ Name is required, aborting create.");
+    return;
+  }
+
   try {
-    await ingredientsAPI.add(newIngredient.value);
-    closeCreateModal();
+    const payload = normalizePayload(newIngredient.value);
+    console.log("➡️ Creating ingredient with payload:", payload);
+    const res = await ingredientsAPI.add(payload);
+    console.log("✅ Ingredient created:", res.data);
+
+    showCreateModal.value = false;
+    newIngredient.value = resetNewIngredient();
+
     await loadIngredients();
   } catch (error) {
-    console.error("Erreur création ingrédient:", error);
+    console.error("❌ Error while creating ingredient:", error);
+    alert("Error while creating ingredient. Check console for details.");
   }
 };
 
-const openEditModal = (ingredient) => {
-  editingIngredient.value = { ...ingredient };
+/* ---------------------------
+   EDIT
+--------------------------- */
+const openEditModal = (ing) => {
+  editingIngredient.value = {
+    ...ing,
+    expiry_date: ing.expiry_date || null,
+  };
   showEditModal.value = true;
 };
 
 const saveEditIngredient = async () => {
-  if (!editingIngredient.value.name.trim() || editingIngredient.value.quantity <= 0) return;
+  if (!editingIngredient.value?.name?.trim()) return;
+
   try {
-    await ingredientsAPI.update(editingIngredient.value.id, editingIngredient.value);
-    closeEditModal();
+    const payload = normalizePayload(editingIngredient.value);
+    console.log(
+      `➡️ Updating ingredient ${editingIngredient.value.id} with payload:`,
+      payload,
+    );
+    const res = await ingredientsAPI.update(editingIngredient.value.id, payload);
+    console.log("✅ Ingredient updated:", res.data);
+
+    showEditModal.value = false;
+    editingIngredient.value = null;
+
     await loadIngredients();
   } catch (error) {
-    console.error("Erreur modification ingrédient:", error);
+    console.error("❌ Error while updating ingredient:", error);
+    alert("Error while updating ingredient. Check console for details.");
   }
 };
 
+/* ---------------------------
+   DELETE
+--------------------------- */
 const openDeleteConfirm = (id) => {
   deletingIngredientId.value = id;
   showConfirmDeleteModal.value = true;
 };
 
 const deleteIngredient = async () => {
+  if (!deletingIngredientId.value) return;
   try {
+    console.log("🗑 Deleting ingredient id:", deletingIngredientId.value);
     await ingredientsAPI.delete(deletingIngredientId.value);
-    closeDeleteConfirm();
+
+    showConfirmDeleteModal.value = false;
+    deletingIngredientId.value = null;
+
     await loadIngredients();
   } catch (error) {
-    console.error("Erreur suppression ingrédient:", error);
+    console.error("❌ Error while deleting ingredient:", error);
+    alert("Error while deleting ingredient. Check console for details.");
   }
 };
 
-const resetNewIngredient = () => ({
-  name: "",
-  quantity: 1,
-  unit: "unité",
-  expiration_date: null,
-});
-
+/* ---------------------------
+   CLOSE HELPERS
+--------------------------- */
 const closeCreateModal = () => {
   showCreateModal.value = false;
   newIngredient.value = resetNewIngredient();
 };
+
 const closeEditModal = () => {
   showEditModal.value = false;
   editingIngredient.value = null;
 };
+
 const closeDeleteConfirm = () => {
   showConfirmDeleteModal.value = false;
   deletingIngredientId.value = null;
 };
 
-onMounted(() => loadIngredients());
+/* ---------------------------
+   MOUNT
+--------------------------- */
+onMounted(async () => {
+  await loadIngredients();
+});
 </script>
 
 <template>
-<div class="px-4 py-6 sm:px-0 bg-gray-50 min-h-full">
+  <div class="px-4 py-6 sm:px-0 bg-gray-50 min-h-full">
+    <!-- HEADER -->
+    <div
+      class="flex flex-col sm:flex-row justify-between items-center mb-8 border-b pb-4"
+    >
+      <h1 class="text-4xl font-bold text-gray-900">My Ingredients</h1>
 
-  <!-- Header -->
-  <div class="flex flex-col sm:flex-row justify-between items-center mb-8 border-b pb-4">
-    <h1 class="text-4xl font-bold text-gray-900">Mon Inventaire</h1>
-    <button @click="showCreateModal = true"
-      class="flex items-center px-5 py-2 bg-primary-600 text-white font-semibold rounded-md shadow hover:bg-primary-700 transition duration-150 transform hover:scale-105 mt-4 sm:mt-0">
-      <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-      </svg>
-      Ajouter un Ingrédient
-    </button>
-  </div>
-
-  <!-- État de chargement / vide -->
-  <div v-if="isLoading" class="text-center py-10 text-xl text-primary-600">
-    Chargement de l'inventaire...
-  </div>
-  <div v-else-if="!ingredients.length" class="text-center py-10 text-gray-500 italic text-lg bg-white rounded-lg shadow-md">
-    Votre inventaire est vide. Ajoutez quelques ingrédients pour commencer !
-  </div>
-
-  <!-- Tableau -->
-  <div v-else class="bg-white shadow-md rounded-lg overflow-hidden">
-    <table class="min-w-full divide-y divide-gray-200">
-      <thead class="bg-gray-50">
-        <tr>
-          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ingrédient</th>
-          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantité</th>
-          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date d'Expiration</th>
-          <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-        </tr>
-      </thead>
-      <tbody class="bg-white divide-y divide-gray-200">
-        <tr v-for="ing in ingredients" :key="ing.id" class="hover:bg-gray-50 transition">
-          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ ing.name }}</td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ ing.quantity }} {{ ing.unit }}</td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm">
-            <span :class="{
-                'bg-red-100 text-red-800': ing.expiration_date && new Date(ing.expiration_date) < new Date(),
-                'bg-yellow-100 text-yellow-800': ing.expiration_date && new Date(ing.expiration_date) < new Date(Date.now()+7*24*60*60*1000) && new Date(ing.expiration_date) >= new Date(),
-                'bg-green-100 text-green-800': !ing.expiration_date || new Date(ing.expiration_date) >= new Date(Date.now()+7*24*60*60*1000)
-              }" class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full">
-              {{ formatDate(ing.expiration_date) }}
-            </span>
-          </td>
-          <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-            <div class="flex justify-end space-x-3">
-              <button @click="openEditModal(ing)" title="Modifier" class="text-primary-600 hover:text-primary-900 p-1 rounded-full hover:bg-primary-50 transition">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
-                </svg>
-              </button>
-              <button @click="openDeleteConfirm(ing.id)" title="Supprimer" class="text-red-600 hover:text-red-900 p-1 rounded-full hover:bg-red-50 transition">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                </svg>
-              </button>
-            </div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- Modaux Créer / Éditer / Supprimer -->
-  <Transition name="modal-fade">
-    <div v-if="showCreateModal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
-      <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-lg transform transition-all">
-        <h3 class="text-2xl font-bold text-gray-900 mb-4">Ajouter un Nouvel Ingrédient</h3>
-        <form @submit.prevent="createIngredient" class="space-y-4">
-          <input v-model="newIngredient.name" type="text" placeholder="Nom" required class="w-full border p-2 rounded-md">
-          <div class="flex space-x-2">
-            <input v-model.number="newIngredient.quantity" type="number" min="1" required class="w-1/2 border p-2 rounded-md">
-            <select v-model="newIngredient.unit" class="w-1/2 border p-2 rounded-md">
-              <option v-for="unit in UNITS" :key="unit" :value="unit">{{ unit }}</option>
-            </select>
-          </div>
-          <input v-model="newIngredient.expiration_date" type="date" class="w-full border p-2 rounded-md">
-          <div class="flex justify-end space-x-2">
-            <button type="button" @click="closeCreateModal" class="px-4 py-2 bg-gray-200 rounded-md">Annuler</button>
-            <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded-md">Créer</button>
-          </div>
-        </form>
-      </div>
+      <button
+        @click="showCreateModal = true"
+        class="mt-4 sm:mt-0 px-5 py-2 bg-green-600 text-white rounded-md shadow hover:bg-green-700 transition transform hover:scale-105"
+      >
+        Add Ingredient
+      </button>
     </div>
-  </Transition>
 
-  <Transition name="modal-fade">
-    <div v-if="showEditModal && editingIngredient" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
-      <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-lg transform transition-all">
-        <h3 class="text-2xl font-bold text-gray-900 mb-4">Modifier: {{ editingIngredient.name }}</h3>
-        <form @submit.prevent="saveEditIngredient" class="space-y-4">
-          <input v-model="editingIngredient.name" type="text" required class="w-full border p-2 rounded-md">
-          <div class="flex space-x-2">
-            <input v-model.number="editingIngredient.quantity" type="number" min="1" required class="w-1/2 border p-2 rounded-md">
-            <select v-model="editingIngredient.unit" class="w-1/2 border p-2 rounded-md">
-              <option v-for="unit in UNITS" :key="unit" :value="unit">{{ unit }}</option>
-            </select>
-          </div>
-          <input v-model="editingIngredient.expiration_date" type="date" class="w-full border p-2 rounded-md">
-          <div class="flex justify-end space-x-2">
-            <button type="button" @click="closeEditModal" class="px-4 py-2 bg-gray-200 rounded-md">Annuler</button>
-            <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded-md">Enregistrer</button>
-          </div>
-        </form>
-      </div>
+    <!-- LIST -->
+    <div v-if="isLoading" class="text-center py-10 text-xl text-green-700">
+      Loading ingredients...
     </div>
-  </Transition>
 
-  <Transition name="modal-fade">
-    <div v-if="showConfirmDeleteModal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
-      <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md transform transition-all text-center">
-        <h3 class="text-xl font-bold text-gray-900 mb-4">Confirmer la suppression</h3>
-        <p class="mb-6">Êtes-vous sûr de vouloir supprimer cet ingrédient ? Cette action est irréversible.</p>
-        <div class="flex justify-center space-x-4">
-          <button @click="closeDeleteConfirm" class="px-4 py-2 bg-gray-200 rounded-md">Annuler</button>
-          <button @click="deleteIngredient" class="px-4 py-2 bg-red-600 text-white rounded-md">Supprimer</button>
+    <div
+      v-else-if="!ingredients.length"
+      class="text-center py-10 text-gray-500 italic text-lg bg-white rounded-lg shadow-md"
+    >
+      No ingredients yet. Add one to get started!
+    </div>
+
+    <div v-else class="space-y-4">
+      <div
+        v-for="ing in ingredients"
+        :key="ing.id"
+        class="bg-white p-4 rounded-lg shadow hover:shadow-lg transition flex justify-between items-center"
+      >
+        <div>
+          <h2 class="text-xl font-semibold text-gray-900">
+            {{ ing.name }}
+          </h2>
+          <p class="text-gray-600 mt-1">
+            {{ ing.category }} — {{ ing.location }}
+          </p>
+          <p class="text-gray-500 mt-1 text-sm">
+            {{ ing.quantity }} {{ ing.unit }}
+            <span v-if="ing.expiry_date"> • Expiry: {{ ing.expiry_date }}</span>
+          </p>
+        </div>
+
+        <div class="flex space-x-2">
+          <button
+            @click="openEditModal(ing)"
+            class="px-3 py-1 text-blue-600 hover:text-blue-900 bg-blue-50 rounded-md"
+          >
+            Edit
+          </button>
+          <button
+            @click="openDeleteConfirm(ing.id)"
+            class="px-3 py-1 text-red-600 hover:text-red-900 bg-red-50 rounded-md"
+          >
+            Delete
+          </button>
         </div>
       </div>
     </div>
-  </Transition>
 
-</div>
+    <!-- MODAL CREATE -->
+    <Transition name="modal-fade">
+      <div
+        v-if="showCreateModal"
+        class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50"
+      >
+        <div
+          class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-lg transform transition-all"
+        >
+          <h3 class="text-2xl font-bold text-gray-900 mb-4">
+            Add Ingredient
+          </h3>
+
+          <form @submit.prevent="createIngredient" class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium mb-1">Name</label>
+              <input
+                v-model="newIngredient.name"
+                type="text"
+                required
+                class="w-full border p-2 rounded-md"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-1">Category</label>
+              <select
+                v-model="newIngredient.category"
+                class="w-full border p-2 rounded-md"
+              >
+                <option
+                  v-for="cat in categories"
+                  :key="cat"
+                  :value="cat"
+                >
+                  {{ cat }}
+                </option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-1">Location</label>
+              <select
+                v-model="newIngredient.location"
+                class="w-full border p-2 rounded-md"
+              >
+                <option
+                  v-for="loc in locations"
+                  :key="loc"
+                  :value="loc"
+                >
+                  {{ loc }}
+                </option>
+              </select>
+            </div>
+
+            <div class="grid grid-cols-3 gap-4 items-end">
+              <div class="col-span-2">
+                <label class="block text-sm font-medium mb-1">Quantity</label>
+                <input
+                  v-model="newIngredient.quantity"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  class="w-full border p-2 rounded-md"
+                />
+              </div>
+              <div class="col-span-1">
+                <label class="block text-sm font-medium mb-1">Unit</label>
+                <select
+                  v-model="newIngredient.unit"
+                  class="w-full border p-2 rounded-md"
+                >
+                  <option v-for="u in units" :key="u" :value="u">
+                    {{ u }}
+                  </option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-1">
+                Expiry date (optional)
+              </label>
+              <input
+                v-model="newIngredient.expiry_date"
+                type="date"
+                class="w-full border p-2 rounded-md"
+              />
+            </div>
+
+            <div class="flex justify-end space-x-2">
+              <button
+                type="button"
+                @click="closeCreateModal"
+                class="px-4 py-2 bg-gray-200 rounded-md"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                class="px-4 py-2 bg-green-600 text-white rounded-md"
+              >
+                Create
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- MODAL EDIT -->
+    <Transition name="modal-fade">
+      <div
+        v-if="showEditModal && editingIngredient"
+        class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50"
+      >
+        <div
+          class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-lg transform transition-all"
+        >
+          <h3 class="text-2xl font-bold text-gray-900 mb-4">
+            Edit Ingredient
+          </h3>
+
+          <form @submit.prevent="saveEditIngredient" class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium mb-1">Name</label>
+              <input
+                v-model="editingIngredient.name"
+                type="text"
+                required
+                class="w-full border p-2 rounded-md"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-1">Category</label>
+              <select
+                v-model="editingIngredient.category"
+                class="w-full border p-2 rounded-md"
+              >
+                <option
+                  v-for="cat in categories"
+                  :key="cat"
+                  :value="cat"
+                >
+                  {{ cat }}
+                </option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-1">Location</label>
+              <select
+                v-model="editingIngredient.location"
+                class="w-full border p-2 rounded-md"
+              >
+                <option
+                  v-for="loc in locations"
+                  :key="loc"
+                  :value="loc"
+                >
+                  {{ loc }}
+                </option>
+              </select>
+            </div>
+
+            <div class="grid grid-cols-3 gap-4 items-end">
+              <div class="col-span-2">
+                <label class="block text-sm font-medium mb-1">Quantity</label>
+                <input
+                  v-model="editingIngredient.quantity"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  class="w-full border p-2 rounded-md"
+                />
+              </div>
+              <div class="col-span-1">
+                <label class="block text-sm font-medium mb-1">Unit</label>
+                <select
+                  v-model="editingIngredient.unit"
+                  class="w-full border p-2 rounded-md"
+                >
+                  <option v-for="u in units" :key="u" :value="u">
+                    {{ u }}
+                  </option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-1">
+                Expiry date (optional)
+              </label>
+              <input
+                v-model="editingIngredient.expiry_date"
+                type="date"
+                class="w-full border p-2 rounded-md"
+              />
+            </div>
+
+            <div class="flex justify-end space-x-2">
+              <button
+                type="button"
+                @click="closeEditModal"
+                class="px-4 py-2 bg-gray-200 rounded-md"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                class="px-4 py-2 bg-green-600 text-white rounded-md"
+              >
+                Save
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- MODAL DELETE -->
+    <Transition name="modal-fade">
+      <div
+        v-if="showConfirmDeleteModal"
+        class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50"
+      >
+        <div
+          class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md transform transition-all text-center"
+        >
+          <h3 class="text-xl font-bold text-gray-900 mb-4">
+            Confirm deletion
+          </h3>
+
+          <p class="mb-6">
+            Are you sure you want to delete this ingredient?
+          </p>
+
+          <div class="flex justify-center space-x-4">
+            <button
+              @click="closeDeleteConfirm"
+              class="px-4 py-2 bg-gray-200 rounded-md"
+            >
+              Cancel
+            </button>
+            <button
+              @click="deleteIngredient"
+              class="px-4 py-2 bg-red-600 text-white rounded-md"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </div>
 </template>

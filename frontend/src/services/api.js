@@ -1,13 +1,33 @@
 import axios from "axios";
 
-// 🌐 URL de base du backend
-// Utilise la variable d'environnement définie dans frontend/.env
-// et garantit une cohérence entre Docker, dev local et production.
-const API_BASE = import.meta.env.VITE_BACKEND_URL
-  ? `${import.meta.env.VITE_BACKEND_URL}/api`
-  : "http://localhost:8000/api";
+// ---------------------------------------------------------------------------
+// 🌐 Backend base URL (prod / dev)
+// ---------------------------------------------------------------------------
+//
+// In prod : VITE_BACKEND_URL = https://api.gro-mate.tech
+// In dev  : VITE_BACKEND_URL = http://localhost:8000 (in .env.local, for example)
+const VITE_BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
-// --- Instance Axios principale ---
+function normalizeBaseUrl(url) {
+  if (!url) return url;
+  return url.endsWith("/") ? url.slice(0, -1) : url;
+}
+
+let API_BASE = "";
+
+// If env var is defined, use it
+if (VITE_BACKEND_URL) {
+  API_BASE = normalizeBaseUrl(VITE_BACKEND_URL) + "/api";
+} else {
+  // Fallback: relative /api path (same scheme as the page, so no Mixed Content)
+  API_BASE = "/api";
+}
+
+console.log("🌍 Frontend environment configuration");
+console.log("VITE_BACKEND_URL =", VITE_BACKEND_URL);
+console.log("API_BASE =", API_BASE);
+
+// --- Axios instance ---
 const api = axios.create({
   baseURL: API_BASE,
   headers: {
@@ -15,83 +35,105 @@ const api = axios.create({
   },
 });
 
-// --- Intercepteur pour ajouter automatiquement le token JWT ---
+// --- JWT interceptor ---
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("access_token");
     if (token) config.headers.Authorization = `Bearer ${token}`;
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 );
 
 export default api;
 
 // ---------------------------------------------------------------------------
-// 🤖 API IA (Gemini)
+// 🤖 AI (Gemini)
 // ---------------------------------------------------------------------------
 export const aiAPI = {
-  ask: (question) => api.get(`/ai/ask`, { params: { question } }),
-  recipe: (ingredients) => api.get(`/ai/recipe`, { params: { ingredients } }),
+  ask: (question) => api.get("/ai/ask", { params: { question } }),
+  recipe: (ingredients) => api.get("/ai/recipe", { params: { ingredients } }),
 };
 
 // ---------------------------------------------------------------------------
-// 🧺 Shopping Lists API
+// 🧺 Shopping Lists
+//   Backend: /api/shopping-lists/ ...
+//   We have:
+//   - Shopping lists CRUD
+//   - Items nested under a list + item endpoints
 // ---------------------------------------------------------------------------
 export const shoppingListsAPI = {
-  getAll: () => api.get(`/shopping-lists`),
-  add: (data) => api.post(`/shopping-lists`, data),
-  update: (id, data) => api.put(`/shopping-lists/${id}`, data),
-  delete: (id) => api.delete(`/shopping-lists/${id}`),
-  addItem: (listId, item) => api.post(`/shopping-lists/${listId}/items`, item),
-  updateItem: (itemId, data) => api.put(`/shopping-lists/items/${itemId}`, data),
-  deleteItem: (itemId) => api.delete(`/shopping-lists/items/${itemId}`),
+  // Lists
+  getAll: () => api.get("/shopping-lists/"),              // GET  /shopping-lists/
+  createList: (data) => api.post("/shopping-lists/", data), // POST /shopping-lists/  { name }
+
+  // Items inside a given list
+  addItem: (listId, data) =>
+    api.post(`/shopping-lists/${listId}/items`, data),     // POST /shopping-lists/{listId}/items
+
+  updateItem: (itemId, data) =>
+    api.put(`/shopping-lists/items/${itemId}`, data),      // PUT  /shopping-lists/items/{itemId}
+
+  deleteItem: (itemId) =>
+    api.delete(`/shopping-lists/items/${itemId}`),         // DELETE /shopping-lists/items/{itemId}
 };
 
 // ---------------------------------------------------------------------------
-// 🥕 Ingredients API
+// 🥕 Ingredients
+//   Backend: /api/ingredients/ ...
 // ---------------------------------------------------------------------------
 export const ingredientsAPI = {
-  getAll: () => api.get(`/ingredients`),
-  add: (data) => api.post(`/ingredients`, data),
+  // NOTE: ending slash avoids unnecessary redirect
+  getAll: () => api.get("/ingredients/"),
+  add: (data) => api.post("/ingredients/", data),
   update: (id, data) => api.put(`/ingredients/${id}`, data),
   delete: (id) => api.delete(`/ingredients/${id}`),
-  getExpiringSoon: () => api.get(`/ingredients/expiring/soon`),
-  seedSample: () => api.post(`/ingredients/seed-sample`),
+
+  getExpiringSoon: (days = 7) =>
+    api.get("/ingredients/expiring/soon", { params: { days } }),
+
+  seedSample: () => api.post("/ingredients/seed-sample"),
 };
 
 // ---------------------------------------------------------------------------
-// 🍽 Recipes API
+// 🍽 Recipes
+//   Backend: /api/recipes/
 // ---------------------------------------------------------------------------
 export const recipesAPI = {
-  getAll: () => api.get(`/recipes`),
-  add: (data) => api.post(`/recipes`, data),
+  getAll: () => api.get("/recipes/"),
+  add: (data) => api.post("/recipes/", data),
   update: (id, data) => api.put(`/recipes/${id}`, data),
   delete: (id) => api.delete(`/recipes/${id}`),
-  findMatching: () => api.get(`/recipes/match/ingredients`),
-  seedSample: () => api.post(`/recipes/seed-sample`),
+
+  findMatching: () => api.get("/recipes/match/ingredients"),
+  seedSample: () => api.post("/recipes/seed-sample"),
 };
 
 // ---------------------------------------------------------------------------
-// 🔐 Auth API
+// 🔐 Auth
+//   Backend: /api/auth/register, /api/auth/token, /api/auth/me, /api/auth/logout
 // ---------------------------------------------------------------------------
 export const authAPI = {
-  register: (data) => api.post(`/auth/register`, data),
+  register: (data) => api.post("/auth/register", data),
+
   login: (email, password) => {
     const formData = new URLSearchParams();
     formData.append("username", email);
     formData.append("password", password);
-    return api.post(`/auth/token`, formData, {
+
+    return api.post("/auth/token", formData, {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
     });
   },
-  me: () => api.get(`/auth/me`),
-  logout: () => api.post(`/auth/logout`),
+
+  me: () => api.get("/auth/me"),
+  logout: () => api.post("/auth/logout"),
 };
 
 // ---------------------------------------------------------------------------
-// 🌱 Seed API (initialisation de données de test)
+// 🌱 Seed (sample data)
+//   Backend: POST /api/seed/
 // ---------------------------------------------------------------------------
 export const seedAPI = {
-  seedAll: () => api.post(`/seed`),
+  seedAll: () => api.post("/seed/"),
 };
