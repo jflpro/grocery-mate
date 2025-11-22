@@ -1,105 +1,113 @@
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Float, Date
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import text
-from sqlalchemy.sql.functions import func 
+from sqlalchemy.sql.functions import func
 
 from .database import Base
 
 # ====================================================================
-# MODÈLES D'AUTHENTIFICATION & UTILISATEUR
+# AUTHENTICATION & USER MODELS
 # ====================================================================
+
 
 class User(Base):
     __tablename__ = "users"
-    
+
     id = Column(Integer, primary_key=True, nullable=False)
     email = Column(String, nullable=False, unique=True)
     username = Column(String, nullable=False, unique=True)
-    password = Column(String, nullable=False) # Le hash du mot de passe
+    password = Column(String, nullable=False)  # Password hash
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    
-    # Relations (pour les relations inverses)
+
+    # Relationships (inverse relations)
     ingredients = relationship("Ingredient", back_populates="owner")
     recipes = relationship("Recipe", back_populates="owner")
     shopping_lists = relationship("ShoppingList", back_populates="owner")
 
+
 # ====================================================================
-# MODÈLE INGRÉDIENT (Inventaire)
+# INGREDIENT MODEL (Inventory)
 # ====================================================================
+
 
 class Ingredient(Base):
     __tablename__ = "ingredients"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     category = Column(String, nullable=False)
-    location = Column(String, nullable=False) 
+    location = Column(String, nullable=False)
     quantity = Column(Float, nullable=False)
-    unit = Column(String, nullable=False) 
+    unit = Column(String, nullable=False)
     expiry_date = Column(Date, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
-    # Clé étrangère vers l'utilisateur (le propriétaire)
+
+    # Foreign key to the user (owner)
     owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     owner = relationship("User", back_populates="ingredients")
 
 
 # ====================================================================
-# MODÈLE RECETTE (Recipe)
+# RECIPE MODEL
 # ====================================================================
+
 
 class Recipe(Base):
     __tablename__ = "recipes"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
     description = Column(String)
-    instructions = Column(String, nullable=False) 
-    
-    prep_time = Column(Integer) # Temps de préparation en minutes
-    cook_time = Column(Integer) # Temps de cuisson en minutes
+    instructions = Column(String, nullable=False)
+
+    prep_time = Column(Integer)  # Preparation time in minutes
+    cook_time = Column(Integer)  # Cooking time in minutes
     servings = Column(Integer)
-    calories = Column(Integer, nullable=True) 
+    calories = Column(Integer, nullable=True)
     is_healthy = Column(Boolean, default=True)
     is_public = Column(Boolean, default=False)
-    
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
-    # Clé étrangère vers l'utilisateur (le créateur/propriétaire)
+
+    # Foreign key to the user (creator/owner)
     owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     owner = relationship("User", back_populates="recipes")
 
-    # Relation vers les ingrédients nécessaires à la recette
+    # Relationship to the ingredients required for the recipe
     required_ingredients = relationship(
-        "RecipeIngredient", 
-        back_populates="recipe", 
-        cascade="all, delete-orphan" 
+        "RecipeIngredient",
+        back_populates="recipe",
+        cascade="all, delete-orphan",
     )
 
+
 # ====================================================================
-# MODÈLE INGRÉDIENT DE RECETTE (RecipeIngredient)
+# RECIPE INGREDIENT MODEL
 # ====================================================================
+
 
 class RecipeIngredient(Base):
     __tablename__ = "recipe_ingredients"
-    
+
     id = Column(Integer, primary_key=True, index=True)
-    
-    # Clé étrangère vers la recette
+
+    # Foreign key to the recipe
     recipe_id = Column(Integer, ForeignKey("recipes.id", ondelete="CASCADE"), nullable=False)
-    
-    # Détails de l'ingrédient requis
+
+    # Details of the required ingredient
     name = Column(String, nullable=False)
     quantity = Column(Float, nullable=False)
-    unit = Column(String, nullable=False) 
-    
+    unit = Column(String, nullable=False)
+
     recipe = relationship("Recipe", back_populates="required_ingredients")
 
+
 # ====================================================================
-# MODÈLE SHOPPING LIST (Liste de Courses)
+# SHOPPING LIST MODEL
 # ====================================================================
+
 
 class ShoppingList(Base):
     __tablename__ = "shopping_lists"
@@ -111,11 +119,18 @@ class ShoppingList(Base):
     owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     owner = relationship("User", back_populates="shopping_lists")
 
-    items = relationship("ShoppingItem", back_populates="shopping_list", cascade="all, delete-orphan") # Relation vers les articles
+    # Relationship to the shopping items
+    items = relationship(
+        "ShoppingItem",
+        back_populates="shopping_list",
+        cascade="all, delete-orphan",
+    )
+
 
 # ====================================================================
-# MODÈLE ARTICLE DE LISTE DE COURSES (ShoppingItem)
+# SHOPPING LIST ITEM MODEL
 # ====================================================================
+
 
 class ShoppingItem(Base):
     __tablename__ = "shopping_items"

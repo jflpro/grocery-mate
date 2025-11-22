@@ -2,33 +2,33 @@ import { defineStore } from "pinia";
 import api, { authAPI } from "@/services/api";
 import router from "@/router";
 
-// Définition du Pinia Store pour l'authentification
 export const useAuthStore = defineStore("auth", {
-  // --- État (State) ---
+  // --- State ---
   state: () => ({
-    user: null,           // Objet utilisateur : { id, email, username } ou null
-    isCheckingAuth: true, // Indique si l'application vérifie l'état d'authentification initial
+    user: null,                 // { id, email, username } or null
+    isCheckingAuth: true,       // initial auth check in progress
+    hasToken: !!localStorage.getItem("access_token"), // reactive flag
   }),
 
   // --- Getters ---
   getters: {
-    // 🔧 FIX : connecté dès qu'un access_token existe
-    isAuthenticated: () => !!localStorage.getItem("access_token"),
+    // ✅ Authenticated if we have a token flag in the store
+    isAuthenticated: (state) => state.hasToken,
 
-    // Retourne directement le token
-    getToken: () => localStorage.getItem("access_token"),
+    // Return current token (still read from localStorage)
+    getToken: (state) =>
+      state.hasToken ? localStorage.getItem("access_token") : null,
 
-    // Optionnel : accès direct au user
     currentUser: (state) => state.user,
   },
 
   // --- Actions ---
   actions: {
-    // --- Connexion ---
+    // --- Login ---
     async login({ username, password, redirectPath = null }) {
       try {
         const formData = new URLSearchParams();
-        formData.append("username", username); // backend attend "username"
+        formData.append("username", username); // backend expects "username"
         formData.append("password", password);
 
         const tokenResponse = await api.post("/auth/token", formData, {
@@ -36,49 +36,50 @@ export const useAuthStore = defineStore("auth", {
         });
 
         const token = tokenResponse.data.access_token;
-        if (!token) throw new Error("Token manquant");
+        if (!token) throw new Error("Missing access token");
 
-        // 1️⃣ On stocke le token → isAuthenticated devient true immédiatement
+        // 1️⃣ Save token + update reactive flag
         localStorage.setItem("access_token", token);
+        this.hasToken = true;
 
-        // 2️⃣ Puis on tente de charger le profil utilisateur
+        // 2️⃣ Load user profile (optional but recommended)
         try {
           await this.fetchUser();
         } catch (e) {
-          console.warn("Login: token OK mais fetchUser a échoué", e);
-          // On ne force pas le logout ici, on laisse l'utilisateur connecté
-          // et éventuellement on gérera ça dans l'UI si besoin.
+          console.warn("Login: token OK but fetchUser failed", e);
+          // Keep user logged in; UI can handle missing profile if needed.
         }
 
-        // 3️⃣ Redirection vers la page initialement demandée ou home
+        // 3️⃣ Redirect to target (home by default)
         const target = redirectPath || { name: "home" };
         router.push(target);
 
         return true;
       } catch (error) {
         this.forceLogout(false);
-        console.error("Erreur login:", error);
+        console.error("Login error:", error);
         throw error;
       }
     },
 
-    // --- Inscription ---
+    // --- Register ---
     async register(data) {
       try {
         await authAPI.register(data);
         router.push({ name: "login" });
         return true;
       } catch (error) {
-        console.error("Erreur d'inscription:", error);
+        console.error("Registration error:", error);
         throw error;
       }
     },
 
-    // --- Récupération utilisateur ---
+    // --- Fetch current user ---
     async fetchUser() {
-      const token = this.getToken; // getter = propriété
+      const token = this.getToken;
       if (!token) {
         this.user = null;
+        this.hasToken = false;
         return;
       }
 
@@ -86,22 +87,19 @@ export const useAuthStore = defineStore("auth", {
         const response = await authAPI.me();
         this.user = response.data;
       } catch (error) {
-        console.error(
-          "Échec récupération utilisateur. Déconnexion forcée.",
-          error,
-        );
-        this.forceLogout(false); // on ne redirige pas forcément, à toi de voir
+        console.error("Failed to fetch user. Forcing logout.", error);
+        this.forceLogout(false);
         throw error;
       }
     },
 
-    // --- Déconnexion ---
+    // --- Logout (API + local) ---
     async logout() {
       try {
         await authAPI.logout();
       } catch (error) {
         console.warn(
-          "Échec de l'appel /logout, mais déconnexion locale effectuée.",
+          "Logout API call failed, but performing local logout.",
           error,
         );
       } finally {
@@ -109,25 +107,29 @@ export const useAuthStore = defineStore("auth", {
       }
     },
 
-    // --- Déconnexion forcée locale ---
+    // --- Local forced logout ---
     forceLogout(shouldRedirect = true) {
       localStorage.removeItem("access_token");
+      this.hasToken = false;
       this.user = null;
+
       if (shouldRedirect) {
         router.push({ name: "login" });
       }
     },
 
-    // --- Initialisation du store au démarrage ---
+    // --- Initialization on app start ---
     async initializeAuth() {
       this.isCheckingAuth = true;
 
-      const token = this.getToken;
-      if (token) {
+      // Sync flag with localStorage at startup
+      this.hasToken = !!localStorage.getItem("access_token");
+
+      if (this.hasToken) {
         try {
           await this.fetchUser();
         } catch (e) {
-          console.warn("initializeAuth: fetchUser a échoué", e);
+          console.warn("initializeAuth: fetchUser failed", e);
         }
       }
 

@@ -16,7 +16,7 @@ const showConfirmDeleteModal = ref(false);
 const newRecipe = ref({
   title: "",
   description: "",
-  ingredient_ids: [],
+  ingredient_ids: [], // selected inventory ingredient IDs for creation
 });
 
 const editingRecipe = ref(null);
@@ -40,10 +40,35 @@ const normalizeRecipePayload = (r) => ({
   calories: r.calories ?? null,
   is_healthy: r.is_healthy ?? false,
   is_public: r.is_public ?? false,
-
-  // Existing ingredient IDs
-  ingredient_ids: Array.isArray(r.ingredient_ids) ? r.ingredient_ids : [],
 });
+
+// Build required_ingredients list from selected ingredient IDs (inventory)
+const buildRequiredIngredientsFromIds = (ingredientIds) => {
+  if (!Array.isArray(ingredientIds) || !ingredientIds.length) return [];
+
+  return ingredientIds
+    .map((id) => ingredients.value.find((i) => i.id === id))
+    .filter(Boolean)
+    .map((ing) => ({
+      name: ing.name,
+      quantity: ing.quantity ?? 1,
+      unit: ing.unit || "",
+    }));
+};
+
+// Map recipe.required_ingredients (backend) to inventory IDs when possible
+const mapRecipeIngredientsToIds = (recipeIngredients) => {
+  if (!Array.isArray(recipeIngredients)) return [];
+
+  const byName = new Map(
+    ingredients.value.map((ing) => [ing.name.toLowerCase(), ing]),
+  );
+
+  return recipeIngredients
+    .map((ri) => byName.get(ri.name.toLowerCase()))
+    .filter(Boolean)
+    .map((ing) => ing.id);
+};
 
 /* -----------------------------------------
    LOADERS
@@ -51,7 +76,7 @@ const normalizeRecipePayload = (r) => ({
 const loadIngredients = async () => {
   try {
     const res = await ingredientsAPI.getAll();
-    ingredients.value = res.data;
+    ingredients.value = res.data || [];
   } catch (error) {
     console.error("Error loading ingredients:", error);
   }
@@ -63,7 +88,8 @@ const loadRecipes = async () => {
     const res = await recipesAPI.getAll();
     recipes.value = (res.data || []).map((r) => ({
       ...r,
-      ingredients: r.ingredients || [],
+      // For UI convenience, expose ingredients as required_ingredients
+      ingredients: r.required_ingredients || r.ingredients || [],
     }));
   } catch (error) {
     console.error("Error loading recipes:", error);
@@ -79,7 +105,16 @@ const createRecipe = async () => {
   if (!newRecipe.value.title.trim()) return;
 
   try {
-    const payload = normalizeRecipePayload(newRecipe.value);
+    const basePayload = normalizeRecipePayload(newRecipe.value);
+    const required_ingredients = buildRequiredIngredientsFromIds(
+      newRecipe.value.ingredient_ids,
+    );
+
+    const payload = {
+      ...basePayload,
+      required_ingredients,
+    };
+
     await recipesAPI.add(payload);
     closeCreateModal();
     await loadRecipes();
@@ -98,7 +133,8 @@ const openEditModal = (recipe) => {
   editingRecipe.value = {
     ...recipe,
     description: recipe.description || "",
-    ingredient_ids: (recipe.ingredients || []).map((i) => i.id),
+    // Try to map required_ingredients names to inventory IDs for the multiselect
+    ingredient_ids: mapRecipeIngredientsToIds(recipe.ingredients || []),
   };
   showEditModal.value = true;
 };
@@ -107,7 +143,10 @@ const saveEditRecipe = async () => {
   if (!editingRecipe.value.title.trim()) return;
 
   try {
+    // For now, we only update base fields; required_ingredients
+    // are not updated by the backend update endpoint.
     const payload = normalizeRecipePayload(editingRecipe.value);
+
     await recipesAPI.update(editingRecipe.value.id, payload);
     closeEditModal();
     await loadRecipes();
@@ -180,7 +219,8 @@ const generateAIRecipe = async () => {
 
   try {
     const res = await aiAPI.recipe(ingredientNames);
-    aiGenerated.value = res.data.recette; // backend payload stays as-is
+    // backend payload key kept in French: "recette"
+    aiGenerated.value = res.data.recette;
   } catch (e) {
     console.error("Error with AI recipe:", e);
   } finally {
@@ -214,6 +254,7 @@ const autoFillFromAI = async () => {
 
     newRecipe.value.title = title;
     newRecipe.value.description = description;
+    // Preselect all inventory ingredients by default
     newRecipe.value.ingredient_ids = ingredients.value.map((i) => i.id);
   } catch (e) {
     console.error("Error AI auto-fill:", e);
@@ -369,7 +410,7 @@ onMounted(async () => {
             ></textarea>
 
             <div>
-              <label class="block font-medium mb-1">Ingredients:</label>
+              <label class="block font-medium mb-1">Ingredients (from inventory):</label>
               <select
                 v-model="newRecipe.ingredient_ids"
                 multiple
@@ -380,7 +421,7 @@ onMounted(async () => {
                   :key="ing.id"
                   :value="ing.id"
                 >
-                  {{ ing.name }}
+                  {{ ing.name }} ({{ ing.quantity }} {{ ing.unit || "" }})
                 </option>
               </select>
             </div>
@@ -433,7 +474,9 @@ onMounted(async () => {
             ></textarea>
 
             <div>
-              <label class="block font-medium mb-1">Ingredients:</label>
+              <label class="block font-medium mb-1">
+                Ingredients (from inventory, currently informational for editing):
+              </label>
               <select
                 v-model="editingRecipe.ingredient_ids"
                 multiple
@@ -444,7 +487,7 @@ onMounted(async () => {
                   :key="ing.id"
                   :value="ing.id"
                 >
-                  {{ ing.name }}
+                  {{ ing.name }} ({{ ing.quantity }} {{ ing.unit || "" }})
                 </option>
               </select>
             </div>

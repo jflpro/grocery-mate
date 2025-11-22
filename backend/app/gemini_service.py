@@ -2,18 +2,19 @@ import os
 import time
 import google.generativeai as genai
 
-# --- Configuration du client Gemini ---
+# --- Gemini client configuration ---
 API_KEY = os.getenv("GEMINI_API_KEY")
 
 if not API_KEY:
-    raise RuntimeError("GEMINI_API_KEY manquant dans l'environnement du backend.")
+    raise RuntimeError("GEMINI_API_KEY is missing in the backend environment.")
 
 genai.configure(api_key=API_KEY)
 
+
 def ask_gemini(prompt: str) -> str:
     """
-    Envoie un prompt à Google Gemini et renvoie la réponse textuelle.
-    Gère les erreurs temporaires (503) avec plusieurs tentatives.
+    Send a prompt to Google Gemini and return the textual response.
+    Handles temporary errors (e.g. 503 / UNAVAILABLE) with multiple retry attempts.
     """
     models_to_try = [
         "models/gemini-2.0-flash",
@@ -33,10 +34,10 @@ def ask_gemini(prompt: str) -> str:
             except Exception as e:
                 err = str(e)
                 if "503" in err or "UNAVAILABLE" in err:
-                    print(f"[!] Modèle {model} surchargé — tentative {attempt + 1}/3...")
+                    print(f"[!] Model {model} overloaded — attempt {attempt + 1}/3...")
                     time.sleep(2)
                     continue
                 else:
-                    return f"Erreur lors de l'appel à Gemini ({model}) : {e}"
+                    return f"Error while calling Gemini ({model}): {e}"
 
-    return "Erreur : tous les modèles Gemini sont temporairement indisponibles."
+    return "Error: all Gemini models are temporarily unavailable."

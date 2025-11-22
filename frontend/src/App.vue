@@ -28,21 +28,21 @@ onMounted(() => {
       <div class="flex items-center space-x-4">
         <template v-if="isAuthenticated">
           <span class="text-sm font-medium">
-            Salut, <span class="font-bold">{{ currentUser?.username || 'Utilisateur' }}</span>
+            Hi, <span class="font-bold">{{ currentUser?.username || 'User' }}</span>
           </span>
           <button 
             @click="handleLogout" 
             class="px-3 py-1 bg-red-500 hover:bg-red-700 rounded-lg text-sm font-semibold transition duration-150 ease-in-out shadow-md"
           >
-            Déconnexion
+            Log Out
           </button>
         </template>
         <template v-else>
           <router-link to="/login" class="px-3 py-1 hover:bg-green-700 rounded-lg text-sm font-semibold">
-            Connexion
+            Login
           </router-link>
           <router-link to="/register" class="px-3 py-1 bg-green-500 hover:bg-green-400 rounded-lg text-sm font-semibold">
-            Inscription
+            Register
           </router-link>
         </template>
       </div>
