@@ -1,6 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 
+// Public landing page
+import LandingPage from '@/views/landing/LandingPage.vue';
+
+// Authenticated views
 import Dashboard from '@/views/Dashboard.vue';
 import Ingredients from '@/views/Ingredients.vue';
 import Recipes from '@/views/Recipes.vue';
@@ -10,11 +14,21 @@ import Register from '@/views/Register.vue';
 
 // Admin views
 import UserManagement from '@/views/admin/UserManagement.vue';
+import LandingCms from '@/views/admin/LandingCms.vue';
 
 const routes = [
+  // Public landing page
   {
     path: '/',
-    name: 'home',
+    name: 'landing',
+    component: LandingPage,
+    meta: { requiresAuth: false },
+  },
+
+  // Authenticated app entry
+  {
+    path: '/app',
+    name: 'home', // garder ce nom pour les redirections existantes
     component: Dashboard,
     meta: { requiresAuth: true },
   },
@@ -36,15 +50,28 @@ const routes = [
     component: ShoppingLists,
     meta: { requiresAuth: true },
   },
+
+  // Admin
   {
     path: '/admin/users',
     name: 'admin-users',
     component: UserManagement,
     meta: {
       requiresAuth: true,
-      // Admin check is enforced by backend (403 if not admin)
+      // le backend renverra 403 si l'utilisateur n'est pas admin
     },
   },
+  {
+    path: '/admin/landing',
+    name: 'admin-landing',
+    component: LandingCms,
+    meta: {
+      requiresAuth: true,
+      // backoffice CMS pour la landing
+    },
+  },
+
+  // Auth
   {
     path: '/login',
     name: 'login',
@@ -68,7 +95,7 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore();
 
-  // Initial auth check
+  // S'assurer que l'état d'auth est chargé (utile au premier chargement)
   if (authStore.isCheckingAuth) {
     await authStore.initializeAuth();
   }
@@ -77,16 +104,23 @@ router.beforeEach(async (to, from, next) => {
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth);
   const guestOnly = to.matched.some((record) => record.meta.guestOnly);
 
-  // Protected routes
+  // Utilisateur connecté qui essaie d'aller sur la landing -> /app
+  if (to.name === 'landing' && isAuthenticated) {
+    console.log('➡️ Utilisateur connecté, redirection vers /app depuis la landing.');
+    next({ name: 'home' });
+    return;
+  }
+
+  // Routes protégées
   if (requiresAuth && !isAuthenticated) {
-    console.log('🔒 Redirection vers Login: Route protégée.');
+    console.log('🔒 Redirection vers Login: route protégée.');
     next({ name: 'login', query: { redirect: to.fullPath } });
     return;
   }
 
-  // Guest-only routes
+  // Routes réservées aux invités
   if (guestOnly && isAuthenticated) {
-    console.log('✅ Redirection vers Home: Déjà connecté.');
+    console.log('✅ Redirection vers Home: déjà connecté.');
     next({ name: 'home' });
     return;
   }
