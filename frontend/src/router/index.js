@@ -1,11 +1,15 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
+
 import Dashboard from '@/views/Dashboard.vue';
 import Ingredients from '@/views/Ingredients.vue';
 import Recipes from '@/views/Recipes.vue';
 import ShoppingLists from '@/views/ShoppingLists.vue';
 import Login from '@/views/Login.vue';
 import Register from '@/views/Register.vue';
+
+// Admin views
+import UserManagement from '@/views/admin/UserManagement.vue';
 
 const routes = [
   {
@@ -33,6 +37,15 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/admin/users',
+    name: 'admin-users',
+    component: UserManagement,
+    meta: {
+      requiresAuth: true,
+      // Admin check is enforced by backend (403 if not admin)
+    },
+  },
+  {
     path: '/login',
     name: 'login',
     component: Login,
@@ -51,29 +64,29 @@ const router = createRouter({
   routes,
 });
 
-// --- Garde globale asynchrone ---
+// --- Global async guard ---
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore();
 
-  // Si la vérification initiale n'a pas encore été faite
+  // Initial auth check
   if (authStore.isCheckingAuth) {
     await authStore.initializeAuth();
   }
 
   const isAuthenticated = authStore.isAuthenticated;
-  const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
-  const guestOnly = to.matched.some(record => record.meta.guestOnly);
+  const requiresAuth = to.matched.some((record) => record.meta.requiresAuth);
+  const guestOnly = to.matched.some((record) => record.meta.guestOnly);
 
-  // Routes protégées
+  // Protected routes
   if (requiresAuth && !isAuthenticated) {
-    console.log("🔒 Redirection vers Login: Route protégée.");
+    console.log('🔒 Redirection vers Login: Route protégée.');
     next({ name: 'login', query: { redirect: to.fullPath } });
     return;
   }
 
-  // Routes invité seulement
+  // Guest-only routes
   if (guestOnly && isAuthenticated) {
-    console.log("✅ Redirection vers Home: Déjà connecté.");
+    console.log('✅ Redirection vers Home: Déjà connecté.');
     next({ name: 'home' });
     return;
   }

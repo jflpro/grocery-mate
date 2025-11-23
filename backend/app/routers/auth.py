@@ -1,11 +1,11 @@
 from typing import Annotated
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from app import schemas, auth
+from app import schemas, auth, models
 from app.database import get_db
 from app.utils import security
 
@@ -18,12 +18,18 @@ router = APIRouter(
 # 1. Register
 # ---------------------------------------------------------
 
+
 @router.post("/register", response_model=schemas.UserOut, status_code=status.HTTP_201_CREATED)
 def register_user(
     user_in: schemas.UserCreate,
     db: Session = Depends(get_db),
 ):
-    """Crée un nouvel utilisateur. Lève 400 si l'email existe déjà."""
+    """
+    Create a new user account.
+
+    Raises:
+        400 if the email is already registered.
+    """
     db_user = auth.get_user_by_email(db, email=user_in.email)
     if db_user:
         raise HTTPException(
@@ -37,15 +43,23 @@ def register_user(
 # 2. Login / Token
 # ---------------------------------------------------------
 
+
 @router.post("/token", response_model=schemas.Token)
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: Session = Depends(get_db),
 ):
     """
-    Authentifie l'utilisateur et génère un JWT.
-    form_data.username = email (côté frontend tu envoies email dans 'username').
+    Authenticate the user and generate a JWT access token.
+
+    Notes:
+        - form_data.username = email (the frontend sends the email field as "username").
+        - Enforces:
+            * valid credentials
+            * active account (is_active = True)
+        - Updates last_login on successful login.
     """
+    # 1) Check credentials
     user = auth.authenticate_user(
         db, email=form_data.username, password=form_data.password
     )
@@ -53,10 +67,22 @@ async def login_for_access_token(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # 2) Check if account is active
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is deactivated. Contact the administrator.",
+        )
+
+    # 3) Update last_login
+    user.last_login = datetime.utcnow()
+    db.commit()
+
+    # 4) Create access token
     access_token_expires = timedelta(
         minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES
     )
@@ -72,11 +98,14 @@ async def login_for_access_token(
 # 3. /me
 # ---------------------------------------------------------
 
+
 @router.get("/me", response_model=schemas.UserOut)
 async def read_users_me(
-    current_user = Depends(auth.get_current_active_user),
+    current_user: models.User = Depends(auth.get_current_active_user),
 ):
-    """Retourne l'utilisateur actuellement authentifié."""
+    """
+    Return the currently authenticated and active user.
+    """
     return current_user
 
 
@@ -84,13 +113,16 @@ async def read_users_me(
 # 4. Logout
 # ---------------------------------------------------------
 
+
 @router.post("/logout", status_code=status.HTTP_200_OK)
 def logout_user(
-    current_user = Depends(auth.get_current_active_user),
+    current_user: models.User = Depends(auth.get_current_active_user),
 ):
     """
-    Pour JWT : il n'y a pas de vraie invalidation côté backend
-    => le frontend doit juste supprimer le token stocké.
+    For JWT:
+        there is no real server-side token invalidation.
+
+    The frontend must delete the stored access token (localStorage).
     """
     return {
         "message": "Successfully logged out. Client token should be deleted."

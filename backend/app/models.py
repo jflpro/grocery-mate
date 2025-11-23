@@ -16,13 +16,40 @@ class User(Base):
     id = Column(Integer, primary_key=True, nullable=False)
     email = Column(String, nullable=False, unique=True)
     username = Column(String, nullable=False, unique=True)
-    password = Column(String, nullable=False)  # Password hash
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    # Password hash (kept as 'password' for backward compatibility)
+    password = Column(String, nullable=False)
+
+    # --- Admin / status fields ---
+    is_active = Column(Boolean, nullable=False, server_default=text("true"))
+    is_admin = Column(Boolean, nullable=False, server_default=text("false"))
+    last_login = Column(DateTime(timezone=True), nullable=True)
+
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
 
     # Relationships (inverse relations)
-    ingredients = relationship("Ingredient", back_populates="owner")
-    recipes = relationship("Recipe", back_populates="owner")
-    shopping_lists = relationship("ShoppingList", back_populates="owner")
+    # Let PostgreSQL handle ON DELETE CASCADE, don't try to set owner_id = NULL
+    ingredients = relationship(
+        "Ingredient",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    recipes = relationship(
+        "Recipe",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    shopping_lists = relationship(
+        "ShoppingList",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
 
 # ====================================================================
@@ -41,10 +68,18 @@ class Ingredient(Base):
     unit = Column(String, nullable=False)
     expiry_date = Column(Date, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
 
     # Foreign key to the user (owner)
-    owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    owner_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     owner = relationship("User", back_populates="ingredients")
 
 
@@ -69,10 +104,18 @@ class Recipe(Base):
     is_public = Column(Boolean, default=False)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
 
     # Foreign key to the user (creator/owner)
-    owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    owner_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     owner = relationship("User", back_populates="recipes")
 
     # Relationship to the ingredients required for the recipe
@@ -94,7 +137,11 @@ class RecipeIngredient(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     # Foreign key to the recipe
-    recipe_id = Column(Integer, ForeignKey("recipes.id", ondelete="CASCADE"), nullable=False)
+    recipe_id = Column(
+        Integer,
+        ForeignKey("recipes.id", ondelete="CASCADE"),
+        nullable=False,
+    )
 
     # Details of the required ingredient
     name = Column(String, nullable=False)
@@ -116,7 +163,11 @@ class ShoppingList(Base):
     name = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    owner_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     owner = relationship("User", back_populates="shopping_lists")
 
     # Relationship to the shopping items
@@ -142,5 +193,9 @@ class ShoppingItem(Base):
     is_purchased = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    shopping_list_id = Column(Integer, ForeignKey("shopping_lists.id", ondelete="CASCADE"), nullable=False)
+    shopping_list_id = Column(
+        Integer,
+        ForeignKey("shopping_lists.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     shopping_list = relationship("ShoppingList", back_populates="items")
