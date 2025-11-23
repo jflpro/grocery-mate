@@ -199,3 +199,45 @@ class ShoppingItem(Base):
         nullable=False,
     )
     shopping_list = relationship("ShoppingList", back_populates="items")
+
+
+# ====================================================================
+# LANDING CONTENT MODEL (CMS simple)
+# ====================================================================
+
+
+class LandingContent(Base):
+    __tablename__ = "landing_content"
+
+    id = Column(Integer, primary_key=True, nullable=False)
+
+    hero_title = Column(String, nullable=False)
+    hero_subtitle = Column(String, nullable=False)
+
+    feature1_title = Column(String, nullable=False)
+    feature1_text = Column(String, nullable=False)
+
+    feature2_title = Column(String, nullable=False)
+    feature2_text = Column(String, nullable=False)
+
+    feature3_title = Column(String, nullable=False)
+    feature3_text = Column(String, nullable=False)
+
+    how1_title = Column(String, nullable=False)
+    how1_text = Column(String, nullable=False)
+
+    how2_title = Column(String, nullable=False)
+    how2_text = Column(String, nullable=False)
+
+    how3_title = Column(String, nullable=False)
+    how3_text = Column(String, nullable=False)
+
+    cta_title = Column(String, nullable=False)
+    cta_subtitle = Column(String, nullable=False)
+
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )

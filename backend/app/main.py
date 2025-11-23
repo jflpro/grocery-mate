@@ -11,7 +11,8 @@ from .routers import (
     seed,
     newsletter,
     ai,
-    admin,  # 🆕 Admin router
+    admin,   # Admin router
+    landing, # Landing CMS/public
 )
 
 # --------------------------------------------------------------------
@@ -86,10 +87,13 @@ app.include_router(seed.router, prefix="/api")
 app.include_router(newsletter.router, prefix="/api")
 
 # IA (endpoints spécifiques IA)
-# ⚠️ Router déjà préfixé en interne, on garde ce wiring existant
 # => /api/ai/...
 app.include_router(ai.router, prefix="/api/ai")
 
 # Admin (user management)
 # => /api/admin/...
 app.include_router(admin.router, prefix="/api")
+
+# Landing (public + CMS admin)
+# => /api/landing/...
+app.include_router(landing.router, prefix="/api")

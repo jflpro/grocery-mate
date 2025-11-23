@@ -12,11 +12,8 @@
       <!-- Hero section -->
       <main class="hero">
         <div class="hero-content">
-          <h2>Smart Grocery Management</h2>
-          <p>
-            Track your inventory, avoid waste, and plan your recipes with a
-            simple, modern web app.
-          </p>
+          <h2>{{ content.hero_title }}</h2>
+          <p>{{ content.hero_subtitle }}</p>
           <div class="hero-actions">
             <RouterLink to="/login" class="btn-primary">
               Get started
@@ -34,22 +31,16 @@
           <h3 class="section-title">Why GroceryMate?</h3>
           <div class="features-grid">
             <div class="feature-card">
-              <h4>Real-time inventory</h4>
-              <p>
-                Know exactly what you have in your fridge and pantry, anytime.
-              </p>
+              <h4>{{ content.feature1_title }}</h4>
+              <p>{{ content.feature1_text }}</p>
             </div>
             <div class="feature-card">
-              <h4>Anti-waste by design</h4>
-              <p>
-                Track expiry dates and use ingredients before they go to waste.
-              </p>
+              <h4>{{ content.feature2_title }}</h4>
+              <p>{{ content.feature2_text }}</p>
             </div>
             <div class="feature-card">
-              <h4>Recipe-friendly</h4>
-              <p>
-                Link your ingredients to recipes and plan meals with confidence.
-              </p>
+              <h4>{{ content.feature3_title }}</h4>
+              <p>{{ content.feature3_text }}</p>
             </div>
           </div>
         </div>
@@ -63,29 +54,22 @@
             <li>
               <span class="step-badge">1</span>
               <div class="step-content">
-                <h4>Create your account</h4>
-                <p>
-                  Sign up in a few seconds and secure your personal space.
-                </p>
+                <h4>{{ content.how1_title }}</h4>
+                <p>{{ content.how1_text }}</p>
               </div>
             </li>
             <li>
               <span class="step-badge">2</span>
               <div class="step-content">
-                <h4>Add your ingredients</h4>
-                <p>
-                  Save what you already have at home: name, quantity, location,
-                  expiry date.
-                </p>
+                <h4>{{ content.how2_title }}</h4>
+                <p>{{ content.how2_text }}</p>
               </div>
             </li>
             <li>
               <span class="step-badge">3</span>
               <div class="step-content">
-                <h4>Plan & shop smarter</h4>
-                <p>
-                  Build shopping lists and recipes based on your real inventory.
-                </p>
+                <h4>{{ content.how3_title }}</h4>
+                <p>{{ content.how3_text }}</p>
               </div>
             </li>
           </ol>
@@ -96,9 +80,9 @@
       <section class="section section-cta">
         <div class="section-inner section-cta-inner">
           <div>
-            <h3 class="section-title">Ready to take control of your kitchen?</h3>
+            <h3 class="section-title">{{ content.cta_title }}</h3>
             <p class="section-subtitle">
-              Start with a simple account and keep your groceries under control.
+              {{ content.cta_subtitle }}
             </p>
           </div>
           <RouterLink to="/register" class="btn-primary">
@@ -109,7 +93,7 @@
 
       <!-- Footer -->
       <footer class="landing-footer">
-        <p>© {{ new Date().getFullYear() }} GroceryMate. All rights reserved.</p>
+        <p>© {{ currentYear }} GroceryMate. All rights reserved.</p>
       </footer>
     </div>
   </div>
@@ -117,6 +101,62 @@
 
 <script setup>
 import { RouterLink } from 'vue-router';
+import { ref, computed, onMounted } from 'vue';
+import { landingAPI } from '@/services/api.js';
+
+// état local avec fallback par défaut
+const content = ref({
+  hero_title: 'Smart Grocery Management',
+  hero_subtitle:
+    'Track your inventory, avoid waste, and plan your recipes with a simple, modern web app.',
+
+  feature1_title: 'Real-time inventory',
+  feature1_text: 'Know exactly what you have in your fridge and pantry, anytime.',
+
+  feature2_title: 'Anti-waste by design',
+  feature2_text: 'Track expiry dates and use ingredients before they go to waste.',
+
+  feature3_title: 'Recipe-friendly',
+  feature3_text: 'Link your ingredients to recipes and plan meals with confidence.',
+
+  how1_title: 'Create your account',
+  how1_text: 'Sign up in a few seconds and secure your personal space.',
+
+  how2_title: 'Add your ingredients',
+  how2_text:
+    'Save what you already have at home: name, quantity, location, expiry date.',
+
+  how3_title: 'Plan & shop smarter',
+  how3_text: 'Build shopping lists and recipes based on your real inventory.',
+
+  cta_title: 'Ready to take control of your kitchen?',
+  cta_subtitle: 'Start with a simple account and keep your groceries under control.',
+});
+
+const currentYear = computed(() => new Date().getFullYear());
+
+const isLoading = ref(false);
+const loadError = ref(null);
+
+const loadLandingContent = async () => {
+  try {
+    isLoading.value = true;
+    loadError.value = null;
+
+    const { data } = await landingAPI.getPublic();
+    content.value = data;
+  } catch (err) {
+    console.error('❌ Error loading landing content:', err);
+    loadError.value = 'Unable to load landing content.';
+    // On garde les valeurs par défaut
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+onMounted(() => {
+  loadLandingContent();
+});
 </script>
 
 <style scoped>
@@ -129,7 +169,6 @@ import { RouterLink } from 'vue-router';
   background-repeat: no-repeat;
 }
 
-/* voile sombre pour lisibilité du texte */
 .overlay {
   min-height: 100vh;
   width: 100%;
@@ -225,12 +264,10 @@ import { RouterLink } from 'vue-router';
   background: rgba(15, 23, 42, 0.9);
 }
 
-/* Sections marketing */
 .section {
   padding: 3rem 1.5rem;
 }
 
-/* on pousse la première section pour laisser le logo visible */
 .section-top-offset {
   margin-top: 4rem;
 }
@@ -260,7 +297,6 @@ import { RouterLink } from 'vue-router';
   margin-bottom: 1.5rem;
 }
 
-/* Features grid */
 .features-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -284,7 +320,6 @@ import { RouterLink } from 'vue-router';
   color: #cbd5f5;
 }
 
-/* Steps / How it works */
 .steps-list {
   list-style: none;
   padding: 0;
@@ -323,7 +358,6 @@ import { RouterLink } from 'vue-router';
   color: #cbd5f5;
 }
 
-/* CTA band */
 .section-cta-inner {
   display: flex;
   align-items: center;
@@ -337,7 +371,6 @@ import { RouterLink } from 'vue-router';
   color: #cbd5f5;
 }
 
-/* Footer */
 .landing-footer {
   padding: 1rem 3rem;
   text-align: center;
@@ -346,7 +379,6 @@ import { RouterLink } from 'vue-router';
   background: rgba(15, 23, 42, 0.95);
 }
 
-/* responsive */
 @media (max-width: 1024px) {
   .features-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

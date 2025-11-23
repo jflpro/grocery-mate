@@ -30,3 +30,46 @@ class UserStats(BaseModel):
     active_users: int
     admin_users: int
     new_users_this_month: int
+
+
+# --------------------------------------------------------------------
+# Landing content (CMS)
+# --------------------------------------------------------------------
+
+
+class LandingContentBase(BaseModel):
+    hero_title: str
+    hero_subtitle: str
+
+    feature1_title: str
+    feature1_text: str
+
+    feature2_title: str
+    feature2_text: str
+
+    feature3_title: str
+    feature3_text: str
+
+    how1_title: str
+    how1_text: str
+
+    how2_title: str
+    how2_text: str
+
+    how3_title: str
+    how3_text: str
+
+    cta_title: str
+    cta_subtitle: str
+
+
+class LandingContentOut(LandingContentBase):
+    id: int
+
+    class Config:
+        from_attributes = True  # pour SQLAlchemy 2.x
+
+
+class LandingContentUpdate(LandingContentBase):
+    """Payload complet pour l'update (PUT) depuis l'admin."""
+    pass

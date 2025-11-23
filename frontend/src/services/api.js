@@ -58,13 +58,10 @@ export const aiAPI = {
 // ---------------------------------------------------------------------------
 // 🧺 Shopping Lists
 //   Backend: /api/shopping-lists/ ...
-//   We have:
-//   - Shopping lists CRUD
-//   - Items nested under a list + item endpoints
 // ---------------------------------------------------------------------------
 export const shoppingListsAPI = {
   // Lists
-  getAll: () => api.get("/shopping-lists/"),              // GET  /shopping-lists/
+  getAll: () => api.get("/shopping-lists/"),               // GET  /shopping-lists/
   createList: (data) => api.post("/shopping-lists/", data), // POST /shopping-lists/  { name }
 
   // Items inside a given list
@@ -83,8 +80,11 @@ export const shoppingListsAPI = {
 //   Backend: /api/ingredients/ ...
 // ---------------------------------------------------------------------------
 export const ingredientsAPI = {
-  // NOTE: ending slash avoids unnecessary redirect
-  getAll: () => api.get("/ingredients/"),
+  // NOTE: optional location param pour Dashboard (Fridge / Pantry)
+  getAll: (location) =>
+    api.get("/ingredients/", {
+      params: location ? { location } : undefined,
+    }),
   add: (data) => api.post("/ingredients/", data),
   update: (id, data) => api.put(`/ingredients/${id}`, data),
   delete: (id) => api.delete(`/ingredients/${id}`),
@@ -136,4 +136,19 @@ export const authAPI = {
 // ---------------------------------------------------------------------------
 export const seedAPI = {
   seedAll: () => api.post("/seed/"),
+};
+
+// ---------------------------------------------------------------------------
+// 🧱 Landing page (CMS)
+//   Backend: /api/landing/public, /api/landing/admin
+// ---------------------------------------------------------------------------
+export const landingAPI = {
+  // Public: contenu de la landing
+  getPublic: () => api.get("/landing/public"),
+
+  // Admin: lire le contenu actuel
+  getAdmin: () => api.get("/landing/admin"),
+
+  // Admin: mise à jour complète
+  updateAdmin: (payload) => api.put("/landing/admin", payload),
 };

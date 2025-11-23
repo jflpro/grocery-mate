@@ -8,6 +8,9 @@ from sqlalchemy.orm import Session
 from .. import models, auth, schemas_admin
 from ..database import get_db
 
+from .. import models, auth, schemas_admin
+
+
 router = APIRouter(
     prefix="/admin",
     tags=["Admin"],
@@ -180,3 +183,75 @@ def delete_user(
 
     # 3) Réponse vide 204 (le frontend s'en fiche du body)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+# --------------------------------------------------------------------
+# Landing page CMS (admin only)
+# --------------------------------------------------------------------
+
+
+@router.get("/landing-content", response_model=schemas_admin.LandingContentResponse)
+def get_landing_content(
+    db: Session = Depends(get_db),
+    current_admin: models.User = Depends(auth.get_current_admin_user),
+):
+    """
+    Get the landing page marketing content (single row, id=1).
+    If missing, create it with sensible defaults.
+    """
+    content = db.query(models.LandingContent).get(1)
+    if content is None:
+        content = models.LandingContent(
+            id=1,
+            hero_title="Smart Grocery Management",
+            hero_subtitle=(
+                "Track your inventory, avoid waste, and plan your recipes "
+                "with a simple, modern web app."
+            ),
+            feature1_title="Real-time inventory",
+            feature1_text="Know exactly what you have in your fridge and pantry, anytime.",
+            feature2_title="Anti-waste by design",
+            feature2_text="Track expiry dates and use ingredients before they go to waste.",
+            feature3_title="Recipe-friendly",
+            feature3_text="Link your ingredients to recipes and plan meals with confidence.",
+            how1_title="Create your account",
+            how1_text="Sign up in a few seconds and secure your personal space.",
+            how2_title="Add your ingredients",
+            how2_text=(
+                "Save what you already have at home: name, quantity, location, expiry date."
+            ),
+            how3_title="Plan & shop smarter",
+            how3_text="Build shopping lists and recipes based on your real inventory.",
+            cta_title="Ready to take control of your kitchen?",
+            cta_subtitle=(
+                "Start with a simple account and keep your groceries under control."
+            ),
+        )
+        db.add(content)
+        db.commit()
+        db.refresh(content)
+
+    return content
+
+
+@router.put("/landing-content", response_model=schemas_admin.LandingContentResponse)
+def update_landing_content(
+    payload: schemas_admin.LandingContentUpdate,
+    db: Session = Depends(get_db),
+    current_admin: models.User = Depends(auth.get_current_admin_user),
+):
+    """
+    Update landing page marketing content (admin only).
+    """
+    content = db.query(models.LandingContent).get(1)
+    if content is None:
+        # Si jamais la ligne n'existe pas, on la crée
+        content = models.LandingContent(id=1)
+        db.add(content)
+
+    data = payload.model_dump()
+    for field, value in data.items():
+        setattr(content, field, value)
+
+    db.commit()
+    db.refresh(content)
+    return content

@@ -45,6 +45,7 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    // route cohérente avec le composant et les liens
     path: '/shopping-lists',
     name: 'shopping-lists',
     component: ShoppingLists,
@@ -58,7 +59,7 @@ const routes = [
     component: UserManagement,
     meta: {
       requiresAuth: true,
-      // le backend renverra 403 si l'utilisateur n'est pas admin
+      // Le backend renvoie 403 si l'utilisateur n'est pas admin
     },
   },
   {
@@ -67,7 +68,7 @@ const routes = [
     component: LandingCms,
     meta: {
       requiresAuth: true,
-      // backoffice CMS pour la landing
+      // Backoffice CMS pour la landing
     },
   },
 
@@ -91,20 +92,15 @@ const router = createRouter({
   routes,
 });
 
-// --- Global async guard ---
-router.beforeEach(async (to, from, next) => {
+// --- Global guard ---
+router.beforeEach((to, from, next) => {
   const authStore = useAuthStore();
-
-  // S'assurer que l'état d'auth est chargé (utile au premier chargement)
-  if (authStore.isCheckingAuth) {
-    await authStore.initializeAuth();
-  }
 
   const isAuthenticated = authStore.isAuthenticated;
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth);
   const guestOnly = to.matched.some((record) => record.meta.guestOnly);
 
-  // Utilisateur connecté qui essaie d'aller sur la landing -> /app
+  // Rediriger un utilisateur déjà loggé qui va sur "/" vers /app
   if (to.name === 'landing' && isAuthenticated) {
     console.log('➡️ Utilisateur connecté, redirection vers /app depuis la landing.');
     next({ name: 'home' });
