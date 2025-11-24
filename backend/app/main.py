@@ -1,4 +1,3 @@
-# 📁 app/main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -11,6 +10,9 @@ from .routers import (
     seed,
     newsletter,
     ai,
+    admin,    # Admin router
+    landing,  # Landing CMS/public
+    news,     # News (public + admin)
 )
 
 # --------------------------------------------------------------------
@@ -87,3 +89,15 @@ app.include_router(newsletter.router, prefix="/api")
 # IA (endpoints spécifiques IA)
 # => /api/ai/...
 app.include_router(ai.router, prefix="/api/ai")
+
+# Admin (user management)
+# => /api/admin/...
+app.include_router(admin.router, prefix="/api")
+
+# Landing (public + CMS admin)
+# => /api/landing/...
+app.include_router(landing.router, prefix="/api")
+
+# News (public + admin)
+# => /api/news/...
+app.include_router(news.router, prefix="/api")

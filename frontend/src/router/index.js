@@ -1,5 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
+
+// Public landing page
+import LandingPage from '@/views/landing/LandingPage.vue';
+
+// Authenticated views
 import Dashboard from '@/views/Dashboard.vue';
 import Ingredients from '@/views/Ingredients.vue';
 import Recipes from '@/views/Recipes.vue';
@@ -7,10 +12,23 @@ import ShoppingLists from '@/views/ShoppingLists.vue';
 import Login from '@/views/Login.vue';
 import Register from '@/views/Register.vue';
 
+// Admin views
+import UserManagement from '@/views/admin/UserManagement.vue';
+import LandingCms from '@/views/admin/LandingCms.vue';
+
 const routes = [
+  // Public landing page
   {
     path: '/',
-    name: 'home',
+    name: 'landing',
+    component: LandingPage,
+    meta: { requiresAuth: false },
+  },
+
+  // Authenticated app entry
+  {
+    path: '/app',
+    name: 'home', // garder ce nom pour les redirections existantes
     component: Dashboard,
     meta: { requiresAuth: true },
   },
@@ -27,11 +45,34 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    // route cohérente avec le composant et les liens
     path: '/shopping-lists',
     name: 'shopping-lists',
     component: ShoppingLists,
     meta: { requiresAuth: true },
   },
+
+  // Admin
+  {
+    path: '/admin/users',
+    name: 'admin-users',
+    component: UserManagement,
+    meta: {
+      requiresAuth: true,
+      // Le backend renvoie 403 si l'utilisateur n'est pas admin
+    },
+  },
+  {
+    path: '/admin/landing',
+    name: 'admin-landing',
+    component: LandingCms,
+    meta: {
+      requiresAuth: true,
+      // Backoffice CMS pour la landing
+    },
+  },
+
+  // Auth
   {
     path: '/login',
     name: 'login',
@@ -51,33 +92,29 @@ const router = createRouter({
   routes,
 });
 
-// --- Garde globale asynchrone ---
-router.beforeEach(async (to, from, next) => {
+// --- Global guard ---
+router.beforeEach((to, from, next) => {
   const authStore = useAuthStore();
 
-  // Si la vérification initiale n'a pas encore été faite
-  if (authStore.isCheckingAuth) {
-    await authStore.initializeAuth();
-  }
-
   const isAuthenticated = authStore.isAuthenticated;
-  const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
-  const guestOnly = to.matched.some(record => record.meta.guestOnly);
+  const requiresAuth = to.matched.some((record) => record.meta.requiresAuth);
+  const guestOnly = to.matched.some((record) => record.meta.guestOnly);
 
   // Routes protégées
   if (requiresAuth && !isAuthenticated) {
-    console.log("🔒 Redirection vers Login: Route protégée.");
+    console.log('🔒 Redirection vers Login: route protégée.');
     next({ name: 'login', query: { redirect: to.fullPath } });
     return;
   }
 
-  // Routes invité seulement
+  // Routes réservées aux invités (login / register)
   if (guestOnly && isAuthenticated) {
-    console.log("✅ Redirection vers Home: Déjà connecté.");
+    console.log('✅ Redirection vers Home: déjà connecté.');
     next({ name: 'home' });
     return;
   }
 
+  // La landing "/" reste accessible même connecté
   next();
 });
 

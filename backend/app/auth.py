@@ -10,19 +10,22 @@ from app.database import get_db
 from app.utils import security
 
 # --- OAuth2 Scheme ---
-# ⚠️ DOIT correspondre à /api/auth/token (avec le prefix /api du main.py)
+# MUST match /api/auth/token (with the /api prefix added in main.py)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
 
 
-# --- CRUD Utilisateur de base ---
+# -------------------------------------------------------------------
+# Basic user CRUD helpers
+# -------------------------------------------------------------------
+
 
 def get_user_by_email(db: Session, email: str) -> Optional[models.User]:
-    """Récupère un utilisateur par email."""
+    """Return a user by email, or None if not found."""
     return db.query(models.User).filter(models.User.email == email).first()
 
 
 def create_user(db: Session, user: schemas.UserCreate) -> models.User:
-    """Crée un nouvel utilisateur avec mot de passe haché."""
+    """Create a new user with a hashed password."""
     db_user = models.User(
         email=user.email,
         username=user.username,
@@ -35,20 +38,34 @@ def create_user(db: Session, user: schemas.UserCreate) -> models.User:
 
 
 def authenticate_user(db: Session, email: str, password: str) -> Optional[models.User]:
-    """Vérifie les identifiants et retourne l'utilisateur si valides."""
+    """
+    Verify credentials and return the user if valid, otherwise None.
+
+    NOTE:
+        This function only checks email + password.
+        Business rules like is_active are enforced at the router level.
+    """
     user = get_user_by_email(db, email=email)
     if not user or not security.verify_password(password, user.password):
         return None
     return user
 
 
-# --- Dépendances FastAPI pour la validation JWT ---
+# -------------------------------------------------------------------
+# FastAPI dependencies for JWT validation
+# -------------------------------------------------------------------
+
 
 def get_current_user(
     db: Session = Depends(get_db),
     token: str = Depends(oauth2_scheme),
 ) -> models.User:
-    """Valide le token JWT et retourne l'utilisateur."""
+    """
+    Validate the JWT access token and return the associated User.
+
+    Raises:
+        HTTPException(401) if the token is invalid or the user does not exist.
+    """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -72,7 +89,35 @@ def get_current_user(
 def get_current_active_user(
     current_user: models.User = Depends(get_current_user),
 ) -> models.User:
-    """Retourne l'utilisateur authentifié (pas de champ is_active dans ton modèle)."""
+    """
+    Return the currently authenticated user, only if the account is active.
+
+    Raises:
+        HTTPException(403) if the user account is deactivated.
+    """
+    # We now use the is_active field added to the User model
+    if not current_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is deactivated",
+        )
+    return current_user
+
+
+def get_current_admin_user(
+    current_user: models.User = Depends(get_current_active_user),
+) -> models.User:
+    """
+    Return the currently authenticated user, only if they are an admin.
+
+    Raises:
+        HTTPException(403) if the user is not an admin.
+    """
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized. Admin access required.",
+        )
     return current_user
 
 
@@ -81,8 +126,10 @@ def get_current_user_optional(
     db: Session = Depends(get_db),
 ) -> Optional[models.User]:
     """
-    Version "soft" : si le token est invalide => retourne None au lieu de 401.
-    Utile pour des routes publiques où l'utilisateur est optionnel.
+    "Soft" version of get_current_user.
+
+    If the token is invalid or missing, returns None instead of 401.
+    Useful for public endpoints where the user is optional.
     """
     try:
         return get_current_user(db=db, token=token)
