@@ -76,6 +76,48 @@
         </div>
       </section>
 
+      <!-- News section -->
+      <section class="section section-light">
+        <div class="section-inner">
+          <h3 class="section-title">Latest news</h3>
+
+          <p v-if="newsError" class="news-error">
+            {{ newsError }}
+          </p>
+          <p v-else-if="isNewsLoading" class="news-loading">
+            Loading news...
+          </p>
+          <p v-else-if="news.length === 0" class="news-empty">
+            No news published yet.
+          </p>
+
+          <div v-else class="news-grid">
+            <article
+              v-for="article in news"
+              :key="article.id"
+              class="news-card"
+            >
+              <div v-if="article.image_url" class="news-image-wrapper">
+                <img
+                  :src="article.image_url"
+                  :alt="article.title"
+                  class="news-image"
+                />
+              </div>
+              <div class="news-content">
+                <h4 class="news-title">{{ article.title }}</h4>
+                <p class="news-summary">
+                  {{ article.summary || article.content }}
+                </p>
+                <p class="news-date">
+                  {{ formatDate(article.published_at) }}
+                </p>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
       <!-- CTA band -->
       <section class="section section-cta">
         <div class="section-inner section-cta-inner">
@@ -102,7 +144,7 @@
 <script setup>
 import { RouterLink } from 'vue-router';
 import { ref, computed, onMounted } from 'vue';
-import { landingAPI } from '@/services/api.js';
+import { landingAPI, newsAPI } from '@/services/api.js';
 
 // état local avec fallback par défaut
 const content = ref({
@@ -138,6 +180,10 @@ const currentYear = computed(() => new Date().getFullYear());
 const isLoading = ref(false);
 const loadError = ref(null);
 
+const news = ref([]);
+const isNewsLoading = ref(false);
+const newsError = ref(null);
+
 const loadLandingContent = async () => {
   try {
     isLoading.value = true;
@@ -154,8 +200,33 @@ const loadLandingContent = async () => {
   }
 };
 
+const loadNews = async () => {
+  try {
+    isNewsLoading.value = true;
+    newsError.value = null;
+
+    const { data } = await newsAPI.getPublic(3);
+    news.value = data;
+  } catch (err) {
+    console.error('❌ Error loading news:', err);
+    newsError.value = 'Unable to load news.';
+  } finally {
+    isNewsLoading.value = false;
+  }
+};
+
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+};
+
 onMounted(() => {
   loadLandingContent();
+  loadNews();
 });
 </script>
 
@@ -379,8 +450,71 @@ onMounted(() => {
   background: rgba(15, 23, 42, 0.95);
 }
 
+/* News section */
+
+.news-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+
+.news-card {
+  background: rgba(15, 23, 42, 0.85);
+  border-radius: 1rem;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.news-image-wrapper {
+  max-height: 160px;
+  overflow: hidden;
+}
+
+.news-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.news-content {
+  padding: 1.2rem 1.5rem 1.3rem;
+}
+
+.news-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+}
+
+.news-summary {
+  font-size: 0.9rem;
+  color: #cbd5f5;
+  margin-bottom: 0.5rem;
+}
+
+.news-date {
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+.news-error,
+.news-loading,
+.news-empty {
+  font-size: 0.95rem;
+  color: #e5e7eb;
+  margin-bottom: 0.8rem;
+}
+
+.news-error {
+  color: #fecaca;
+}
+
 @media (max-width: 1024px) {
   .features-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .news-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -398,7 +532,8 @@ onMounted(() => {
     font-size: 2.1rem;
   }
 
-  .features-grid {
+  .features-grid,
+  .news-grid {
     grid-template-columns: 1fr;
   }
 

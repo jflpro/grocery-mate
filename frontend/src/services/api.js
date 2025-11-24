@@ -61,18 +61,18 @@ export const aiAPI = {
 // ---------------------------------------------------------------------------
 export const shoppingListsAPI = {
   // Lists
-  getAll: () => api.get("/shopping-lists/"),               // GET  /shopping-lists/
+  getAll: () => api.get("/shopping-lists/"), // GET  /shopping-lists/
   createList: (data) => api.post("/shopping-lists/", data), // POST /shopping-lists/  { name }
 
   // Items inside a given list
   addItem: (listId, data) =>
-    api.post(`/shopping-lists/${listId}/items`, data),     // POST /shopping-lists/{listId}/items
+    api.post(`/shopping-lists/${listId}/items`, data), // POST /shopping-lists/{listId}/items
 
   updateItem: (itemId, data) =>
-    api.put(`/shopping-lists/items/${itemId}`, data),      // PUT  /shopping-lists/items/{itemId}
+    api.put(`/shopping-lists/items/${itemId}`, data), // PUT  /shopping-lists/items/{itemId}
 
   deleteItem: (itemId) =>
-    api.delete(`/shopping-lists/items/${itemId}`),         // DELETE /shopping-lists/items/{itemId}
+    api.delete(`/shopping-lists/items/${itemId}`), // DELETE /shopping-lists/items/{itemId}
 };
 
 // ---------------------------------------------------------------------------
@@ -151,4 +151,24 @@ export const landingAPI = {
 
   // Admin: mise à jour complète
   updateAdmin: (payload) => api.put("/landing/admin", payload),
+};
+
+// ---------------------------------------------------------------------------
+// 📰 News (articles pour la landing)
+//   Backend: /api/news/...
+// ---------------------------------------------------------------------------
+export const newsAPI = {
+  // Public
+  getPublic: (limit = 3) =>
+    api.get("/news/public", { params: { limit } }),
+  getBySlug: (slug) => api.get(`/news/public/${slug}`),
+
+  // Admin
+  listAdmin: (includeUnpublished = true) =>
+    api.get("/news/", {
+      params: { include_unpublished: includeUnpublished },
+    }),
+  create: (data) => api.post("/news/", data),
+  update: (id, data) => api.put(`/news/${id}`, data),
+  delete: (id) => api.delete(`/news/${id}`),
 };
