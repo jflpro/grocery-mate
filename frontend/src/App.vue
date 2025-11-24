@@ -49,6 +49,22 @@ onMounted(() => {
         >
           Shopping Lists
         </router-link>
+
+        <!-- Liens admin : visibles seulement si l'utilisateur est admin -->
+        <router-link
+          v-if="isAuthenticated && currentUser?.is_admin"
+          to="/admin/users"
+          class="hover:underline"
+        >
+          Admin
+        </router-link>
+        <router-link
+          v-if="isAuthenticated && currentUser?.is_admin"
+          to="/admin/landing"
+          class="hover:underline"
+        >
+          Landing CMS
+        </router-link>
       </div>
 
       <div class="flex items-center space-x-4">

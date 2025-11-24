@@ -2,36 +2,43 @@ from pydantic import BaseModel, EmailStr, Field
 from datetime import date, datetime
 from typing import Optional, List
 
-# --- BASE / CORE SCHEMAS ---
+# ============================================================
+# BASE / CORE SCHEMAS
+# ============================================================
 
 
-# Base schema for the user
 class UserBase(BaseModel):
     email: EmailStr
     username: str
 
 
-# Schema for user creation (registration)
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8)
 
 
-# Full user schema (used for /auth/me)
 class UserOut(UserBase):
+    """
+    Utilisé pour /auth/me et partout où on renvoie l'utilisateur courant.
+    Doit matcher le modèle SQLAlchemy User.
+    """
     id: int
+    is_active: bool
+    is_admin: bool
     created_at: datetime
+    last_login: Optional[datetime] = None
 
     class Config:
         from_attributes = True
 
 
-# Simple response schema
 class MessageResponse(BaseModel):
     """Standard response for confirmations and error messages."""
     message: str
 
 
-# --- AUTH SCHEMAS ---
+# ============================================================
+# AUTH SCHEMAS
+# ============================================================
 
 
 class Token(BaseModel):
@@ -43,7 +50,9 @@ class TokenData(BaseModel):
     user_id: Optional[int] = None
 
 
-# --- INGREDIENT SCHEMAS (Personal inventory) ---
+# ============================================================
+# INGREDIENT SCHEMAS (Personal inventory)
+# ============================================================
 
 
 class IngredientBase(BaseModel):
@@ -55,12 +64,10 @@ class IngredientBase(BaseModel):
     expiry_date: Optional[date] = None
 
 
-# Schema for ingredient creation
 class IngredientCreate(IngredientBase):
     pass
 
 
-# Schema for ingredient update
 class IngredientUpdate(BaseModel):
     name: Optional[str] = Field(None, max_length=100)
     category: Optional[str] = Field(None, max_length=50)
@@ -70,10 +77,9 @@ class IngredientUpdate(BaseModel):
     expiry_date: Optional[date] = None
 
 
-# Full schema for ingredient reading
 class Ingredient(IngredientBase):
     id: int
-    owner_id: int  # Corresponds to the SQLAlchemy model
+    owner_id: int
     created_at: datetime
     updated_at: datetime
 
@@ -81,7 +87,9 @@ class Ingredient(IngredientBase):
         from_attributes = True
 
 
-# --- RECIPE INGREDIENT SCHEMAS (Required ingredients for ONE recipe) ---
+# ============================================================
+# RECIPE INGREDIENT SCHEMAS
+# ============================================================
 
 
 class RecipeIngredientBase(BaseModel):
@@ -102,30 +110,27 @@ class RecipeIngredient(RecipeIngredientBase):
         from_attributes = True
 
 
-# --- RECIPE SCHEMAS ---
+# ============================================================
+# RECIPE SCHEMAS
+# ============================================================
 
 
 class RecipeBase(BaseModel):
-    # WARNING: Renamed from 'name' to 'title' to match the SQLAlchemy model
     title: str = Field(..., max_length=200)
     description: Optional[str] = None
-    # Removed the 'ingredients' (Text) field because it is handled by the relation
-    # with RecipeIngredient instead
     instructions: str
     prep_time: Optional[int] = Field(None, ge=0)
-    cook_time: Optional[int] = Field(None, ge=0)  # Additional cook_time
+    cook_time: Optional[int] = Field(None, ge=0)
     servings: int = Field(2, ge=1)
     calories: Optional[int] = Field(None, ge=0)
     is_healthy: bool = True
-    is_public: bool = False  # NEW: To share the recipe
+    is_public: bool = False
 
 
-# Schema for recipe creation (includes required ingredients)
 class RecipeCreate(RecipeBase):
     required_ingredients: List[RecipeIngredientCreate] = []
 
 
-# Schema for recipe update
 class RecipeUpdate(BaseModel):
     title: Optional[str] = Field(None, max_length=200)
     description: Optional[str] = None
@@ -138,32 +143,29 @@ class RecipeUpdate(BaseModel):
     is_public: Optional[bool] = None
 
 
-# Full schema for recipe reading (includes required ingredients)
 class RecipeOut(RecipeBase):
     id: int
-    owner_id: int  # Corresponds to the SQLAlchemy model
+    owner_id: int
     created_at: datetime
-    # Relation: required ingredients for this recipe
     required_ingredients: List[RecipeIngredient] = []
 
     class Config:
         from_attributes = True
 
 
-# Schema for inventory check response
 class InventoryCheckResponse(BaseModel):
     recipe_id: int
     can_make: bool
-    # List of missing ingredients and quantities
     missing_items: List[dict]
-    # List of available ingredients and quantities
     available_items: List[dict]
 
     class Config:
         from_attributes = True
 
 
-# --- SHOPPING LIST SCHEMAS ---
+# ============================================================
+# SHOPPING LIST SCHEMAS
+# ============================================================
 
 
 class ShoppingItemBase(BaseModel):
@@ -203,7 +205,7 @@ class ShoppingListCreate(ShoppingListBase):
 
 class ShoppingList(ShoppingListBase):
     id: int
-    owner_id: int  # Corresponds to the SQLAlchemy model
+    owner_id: int
     created_at: datetime
     items: List[ShoppingItem] = []
 

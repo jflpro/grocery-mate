@@ -8,8 +8,6 @@ from sqlalchemy.orm import Session
 from .. import models, auth, schemas_admin
 from ..database import get_db
 
-from .. import models, auth, schemas_admin
-
 
 router = APIRouter(
     prefix="/admin",
@@ -33,7 +31,7 @@ def _get_user_or_404(user_id: int, db: Session) -> models.User:
 
 
 # --------------------------------------------------------------------
-# Admin-protected endpoints
+# Admin-protected endpoints - Users
 # --------------------------------------------------------------------
 
 
@@ -183,6 +181,7 @@ def delete_user(
 
     # 3) Réponse vide 204 (le frontend s'en fiche du body)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
 
 # --------------------------------------------------------------------
 # Landing page CMS (admin only)

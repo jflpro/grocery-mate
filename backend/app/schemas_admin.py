@@ -73,3 +73,8 @@ class LandingContentOut(LandingContentBase):
 class LandingContentUpdate(LandingContentBase):
     """Payload complet pour l'update (PUT) depuis l'admin."""
     pass
+
+
+class LandingContentResponse(LandingContentOut):
+    """Response model for landing content (admin & public)."""
+    pass

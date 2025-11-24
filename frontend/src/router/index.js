@@ -100,13 +100,6 @@ router.beforeEach((to, from, next) => {
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth);
   const guestOnly = to.matched.some((record) => record.meta.guestOnly);
 
-  // Rediriger un utilisateur déjà loggé qui va sur "/" vers /app
-  if (to.name === 'landing' && isAuthenticated) {
-    console.log('➡️ Utilisateur connecté, redirection vers /app depuis la landing.');
-    next({ name: 'home' });
-    return;
-  }
-
   // Routes protégées
   if (requiresAuth && !isAuthenticated) {
     console.log('🔒 Redirection vers Login: route protégée.');
@@ -114,13 +107,14 @@ router.beforeEach((to, from, next) => {
     return;
   }
 
-  // Routes réservées aux invités
+  // Routes réservées aux invités (login / register)
   if (guestOnly && isAuthenticated) {
     console.log('✅ Redirection vers Home: déjà connecté.');
     next({ name: 'home' });
     return;
   }
 
+  // La landing "/" reste accessible même connecté
   next();
 });
 
