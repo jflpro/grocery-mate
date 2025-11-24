@@ -1,0 +1,70 @@
+flowchart TB
+ subgraph INFRA["Infrastruktur – Hetzner vServer"]
+        OS["Ubuntu 24.04.3 LTS<br>2 vCPU, 4 GB RAM, ~38 GB SSD"]
+        DOCKER["Docker Engine 29.0.1<br>Docker Compose v2.40.3"]
+        UFW["UFW Firewall<br>Eingehend: 22,80,81,443,8082,8000,…<br>Mail: 25,465,587,110,143,993,995"]
+  end
+ subgraph NPM["Nginx Proxy Manager"]
+        NPM_SVC["Nginx Proxy Manager<br>Ports Host: 80,81,443<br>Reverse Proxy + SSL/TLS"]
+  end
+ subgraph FRONTEND["Frontend – Vue 3 + Tailwind"]
+        FE["grocery_frontend<br>Container-Port: 80<br>Nginx Static SPA"]
+  end
+ subgraph BACKEND["Backend – FastAPI"]
+        BE["grocery_backend<br>Gunicorn/Uvicorn<br>Container-Port: 8000<br>REST API"]
+  end
+ subgraph DB["Persistente Daten – PostgreSQL & pgAdmin"]
+        PG["grocery_postgres<br>PostgreSQL 16<br>Port: 5432<br>Volume: grocery-mate_postgres_data"]
+        PGA["pgAdmin<br>Port Container: 80<br>Host: 8082/tcp<br>Volume: grocery-mate_pgadmin_data"]
+  end
+ subgraph IDP["Identity – Keycloak"]
+        KC["Keycloak<br>quay.io/keycloak/keycloak:latest<br>Port: 8080 (Container)<br>Volumes: keycloak_*"]
+  end
+ subgraph GM_NET["Docker Netzwerk: grocery-mate_devnet"]
+        NPM
+        FRONTEND
+        BACKEND
+        DB
+        IDP
+  end
+ subgraph MAILCOW_NET["Docker Netzwerk: mailcowdockerized_mailcow-network"]
+        MC_NGINX["mailcow-nginx<br>HTTPS 80/443<br>Weiterleitung auf Mail-Dienste"]
+        MC_STACK["Mailcow Stack<br>Postfix, Dovecot, Rspamd, MariaDB, Redis, SOGo…<br>Standardports: 25,465,587,110,143,993,995"]
+  end
+ subgraph EXTERN["Externe Dienste"]
+        DNS["DNS Provider<br>A/AAAA/CNAME für<br>gro-mate.tech, api.gro-mate.tech,<br>mail.gro-mate.tech, id.gro-mate.tech, pg.gro-mate.tech"]
+        MAILGUN["Mailgun<br>Transaktionale E-Mails via API/SMTP"]
+  end
+ subgraph s1["Docker Netzwerk: grocery-mate_devnet"]
+        n2["Identity – Keycloak"]
+        n3["Persistente Daten – PostgreSQL & pgAdmin"]
+        n4["Backend – FastAPI"]
+        n5["Frontend – Vue 3 + Tailwind"]
+        n6["Nginx Proxy Manager"]
+  end
+    OS --> DOCKER & UFW
+    USER["Benutzer<br>Webbrowser"] -- "HTTPS 443<br>gro-mate.tech / www.gro-mate.tech" --> NPM_SVC
+    USER -- "HTTPS 443<br>api.gro-mate.tech" --> NPM_SVC
+    USER -- "HTTPS 443<br>id.gro-mate.tech" --> NPM_SVC
+    USER -- "HTTPS 443<br>pg.gro-mate.tech" --> NPM_SVC
+    MAILCLIENT["Benutzer<br>Mail-Client (z.B. Outlook, Handy)"] -- SMTP/IMAP/POP3<br>25,465,587,110,143,993,995 --> MC_NGINX
+    NPM_SVC -- HTTP 80<br>Host → Container 80 --> FE
+    NPM_SVC -- HTTP 80<br>Host → Container 8000 --> BE
+    NPM_SVC -- "HTTPS mail.gro-mate.tech 443<br>→ nginx-mailcow 8443" --> MC_NGINX
+    NPM_SVC -- "HTTPS pg.gro-mate.tech 443<br>→ pgAdmin 80" --> PGA
+    NPM_SVC -- "HTTPS id.gro-mate.tech 443<br>→ Keycloak 8080" --> KC
+    BE -- PostgreSQL 5432 --> PG
+    PGA -- PostgreSQL 5432 --> PG
+    MC_NGINX --> MC_STACK
+    MC_STACK -- Ausgehende Mails --> MAILGUN
+    DOCKER --> GM_NET & MAILCOW_NET
+    DNS -. Domainauflösung .- USER
+    DNS -. MX / SPF / DKIM .- MAILCOW_NET
+    n1["grocery_backend<br>Gunicorn/Uvicorn<br>Container-Port: 8000<br>REST API"]
+
+    n1@{ shape: rect}
+    n2@{ shape: rect}
+    n3@{ shape: rect}
+    n4@{ shape: rect}
+    n5@{ shape: rect}
+    n6@{ shape: rect}
